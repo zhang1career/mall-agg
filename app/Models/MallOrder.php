@@ -12,9 +12,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property int $id
- * @property int $user_id
+ * @property int $uid Foundation user id (from GET /api/user/me)
  * @property MallOrderStatus $status
- * @property int $total_amount_minor
+ * @property int $total_price Order total in minor units (e.g. cents); denormalized at creation from line items
  * @property int $ct
  * @property int $ut
  * @property-read Collection<int, MallOrderItem> $items
@@ -25,20 +25,21 @@ class MallOrder extends Model
 
     public $timestamps = false;
 
-    protected $table = 'mall_order';
+    /** @var string SQL reserved word; Laravel quotes identifiers */
+    protected $table = 'order';
 
     protected $fillable = [
-        'user_id',
+        'uid',
         'status',
-        'total_amount_minor',
+        'total_price',
         'ct',
         'ut',
     ];
 
     protected $casts = [
-        'user_id' => 'integer',
+        'uid' => 'integer',
         'status' => MallOrderStatus::class,
-        'total_amount_minor' => 'integer',
+        'total_price' => 'integer',
         'ct' => 'integer',
         'ut' => 'integer',
     ];
@@ -48,6 +49,6 @@ class MallOrder extends Model
      */
     public function items(): HasMany
     {
-        return $this->hasMany(MallOrderItem::class, 'order_id');
+        return $this->hasMany(MallOrderItem::class, 'oid');
     }
 }

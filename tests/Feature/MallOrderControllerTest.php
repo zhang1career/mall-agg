@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Models\MallProductInventory;
-use App\Models\MallProductPrice;
+use App\Models\ProductInventory;
+use App\Models\ProductPrice;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -39,14 +39,14 @@ class MallOrderControllerTest extends TestCase
             ], 200),
         ]);
 
-        MallProductPrice::query()->create([
-            'product_id' => 7,
-            'price_minor' => 100,
+        ProductPrice::query()->create([
+            'pid' => 7,
+            'price' => 100,
             'ct' => 1,
             'ut' => 1,
         ]);
-        MallProductInventory::query()->create([
-            'product_id' => 7,
+        ProductInventory::query()->create([
+            'pid' => 7,
             'quantity' => 3,
             'ct' => 1,
             'ut' => 1,
@@ -59,8 +59,8 @@ class MallOrderControllerTest extends TestCase
         $response->assertCreated()
             ->assertJsonPath('errorCode', 0)
             ->assertJsonPath('data.status', 'pending')
-            ->assertJsonPath('data.total_amount_minor', 200);
+            ->assertJsonPath('data.total_price', 200);
 
-        $this->assertSame(1, (int) MallProductInventory::query()->where('product_id', 7)->value('quantity'));
+        $this->assertSame(1, (int) ProductInventory::query()->where('pid', 7)->value('quantity'));
     }
 }

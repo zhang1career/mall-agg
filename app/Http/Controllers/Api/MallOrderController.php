@@ -186,17 +186,17 @@ class MallOrderController extends Controller
         $lines = [];
         foreach ($order->items as $item) {
             $lines[] = [
-                'product_id' => (int) $item->product_id,
+                'pid' => (int) $item->pid,
                 'quantity' => (int) $item->quantity,
-                'unit_price_minor' => (int) $item->unit_price_minor,
+                'unit_price' => (int) $item->unit_price,
             ];
         }
 
         return [
             'id' => (int) $order->id,
-            'user_id' => (int) $order->user_id,
+            'uid' => (int) $order->uid,
             'status' => $order->status->value,
-            'total_amount_minor' => (int) $order->total_amount_minor,
+            'total_price' => (int) $order->total_price,
             'ct' => (int) $order->ct,
             'ut' => (int) $order->ut,
             'lines' => $lines,
@@ -210,9 +210,9 @@ class MallOrderController extends Controller
     {
         return [
             'id' => (int) $order->id,
-            'user_id' => (int) $order->user_id,
+            'uid' => (int) $order->uid,
             'status' => $order->status->value,
-            'total_amount_minor' => (int) $order->total_amount_minor,
+            'total_price' => (int) $order->total_price,
             'ct' => (int) $order->ct,
             'ut' => (int) $order->ut,
         ];

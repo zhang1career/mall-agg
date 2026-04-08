@@ -44,7 +44,7 @@ final class OrderCommandService
             $prepared = [];
 
             foreach ($merged as $productId => $quantity) {
-                $priceRow = $this->prices->getPriceMinorByProductIds([$productId]);
+                $priceRow = $this->prices->getPriceByProductIds([$productId]);
                 if (! array_key_exists($productId, $priceRow)) {
                     throw new RuntimeException('Missing price for product '.$productId);
                 }
@@ -55,25 +55,25 @@ final class OrderCommandService
                 $lineTotal = $unit * $quantity;
                 $total += $lineTotal;
                 $prepared[] = [
-                    'product_id' => $productId,
+                    'pid' => $productId,
                     'quantity' => $quantity,
-                    'unit_price_minor' => $unit,
+                    'unit_price' => $unit,
                 ];
             }
 
             $order = new MallOrder([
-                'user_id' => $userId,
+                'uid' => $userId,
                 'status' => MallOrderStatus::Pending,
-                'total_amount_minor' => $total,
+                'total_price' => $total,
             ]);
             $order->save();
 
             foreach ($prepared as $p) {
                 $item = new MallOrderItem([
-                    'order_id' => $order->id,
-                    'product_id' => $p['product_id'],
+                    'oid' => $order->id,
+                    'pid' => $p['pid'],
                     'quantity' => $p['quantity'],
-                    'unit_price_minor' => $p['unit_price_minor'],
+                    'unit_price' => $p['unit_price'],
                 ]);
                 $item->save();
             }
@@ -95,7 +95,7 @@ final class OrderCommandService
             $order->load('items');
             if ($current === MallOrderStatus::Pending && $next === MallOrderStatus::Cancelled) {
                 foreach ($order->items as $item) {
-                    $this->inventory->lockAndIncrement((int) $item->product_id, (int) $item->quantity);
+                    $this->inventory->lockAndIncrement((int) $item->pid, (int) $item->quantity);
                 }
             }
 
@@ -112,7 +112,7 @@ final class OrderCommandService
     public function paginateForUser(int $userId, int $perPage = 15)
     {
         return MallOrder::query()
-            ->where('user_id', $userId)
+            ->where('uid', $userId)
             ->orderByDesc('id')
             ->paginate($perPage);
     }
@@ -121,7 +121,7 @@ final class OrderCommandService
     {
         $order = MallOrder::query()
             ->where('id', $orderId)
-            ->where('user_id', $userId)
+            ->where('uid', $userId)
             ->with('items')
             ->first();
 

@@ -18,7 +18,7 @@ final class LocalProductInventoryProvider implements UserBusinessServiceContract
 
     public function key(): string
     {
-        return 'mall_product_inventory';
+        return 'product_inventory';
     }
 
     public function supports(array $context): bool

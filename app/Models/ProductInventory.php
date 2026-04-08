@@ -9,28 +9,28 @@ use Illuminate\Database\Eloquent\Model;
 
 /**
  * @property int $id
- * @property int $product_id
+ * @property int $pid CMS product id
  * @property int $quantity
  * @property int $ct
  * @property int $ut
  */
-class MallProductInventory extends Model
+class ProductInventory extends Model
 {
     use HasMillisTimestamps;
 
     public $timestamps = false;
 
-    protected $table = 'mall_product_inventory';
+    protected $table = 'product_inventory';
 
     protected $fillable = [
-        'product_id',
+        'pid',
         'quantity',
         'ct',
         'ut',
     ];
 
     protected $casts = [
-        'product_id' => 'integer',
+        'pid' => 'integer',
         'quantity' => 'integer',
         'ct' => 'integer',
         'ut' => 'integer',

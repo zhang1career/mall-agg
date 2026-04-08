@@ -38,7 +38,7 @@ class AdminProductController extends Controller
                 $ids[] = (int) $row['id'];
             }
         }
-        $priceMap = $this->prices->getPriceMinorByProductIds($ids);
+        $priceMap = $this->prices->getPriceByProductIds($ids);
         $qtyMap = $this->inventory->getQuantityByProductIds($ids);
 
         return view('admin.products.index', [
@@ -62,7 +62,7 @@ class AdminProductController extends Controller
             'thumbnail' => 'nullable|string|max:2000',
             'main_media' => 'nullable|string|max:2000',
             'ext_media' => 'nullable|string|max:2000',
-            'price_minor' => 'nullable|integer|min:0',
+            'price' => 'nullable|integer|min:0',
             'quantity' => 'nullable|integer|min:0',
         ]);
 
@@ -85,8 +85,8 @@ class AdminProductController extends Controller
             return back()->withInput()->withErrors(['cms' => 'Invalid create response.']);
         }
 
-        if (isset($validated['price_minor'])) {
-            $this->prices->upsertPrice($id, (int) $validated['price_minor']);
+        if (isset($validated['price'])) {
+            $this->prices->upsertPrice($id, (int) $validated['price']);
         }
         if (isset($validated['quantity'])) {
             $this->inventory->upsertQuantity($id, (int) $validated['quantity']);
@@ -104,12 +104,12 @@ class AdminProductController extends Controller
             abort(404, $e->getMessage());
         }
 
-        $priceMap = $this->prices->getPriceMinorByProductIds([$product]);
+        $priceMap = $this->prices->getPriceByProductIds([$product]);
         $qtyMap = $this->inventory->getQuantityByProductIds([$product]);
 
         return view('admin.products.edit', [
             'product' => $row,
-            'price_minor' => $priceMap[$product] ?? null,
+            'price' => $priceMap[$product] ?? null,
             'quantity' => $qtyMap[$product] ?? null,
         ]);
     }
@@ -122,7 +122,7 @@ class AdminProductController extends Controller
             'thumbnail' => 'nullable|string|max:2000',
             'main_media' => 'nullable|string|max:2000',
             'ext_media' => 'nullable|string|max:2000',
-            'price_minor' => 'nullable|integer|min:0',
+            'price' => 'nullable|integer|min:0',
             'quantity' => 'nullable|integer|min:0',
         ]);
 
@@ -140,8 +140,8 @@ class AdminProductController extends Controller
             return back()->withInput()->withErrors(['cms' => $e->getMessage()]);
         }
 
-        if (array_key_exists('price_minor', $validated) && $validated['price_minor'] !== null) {
-            $this->prices->upsertPrice($product, (int) $validated['price_minor']);
+        if (array_key_exists('price', $validated) && $validated['price'] !== null) {
+            $this->prices->upsertPrice($product, (int) $validated['price']);
         }
         if (array_key_exists('quantity', $validated) && $validated['quantity'] !== null) {
             $this->inventory->upsertQuantity($product, (int) $validated['quantity']);

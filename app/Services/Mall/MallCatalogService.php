@@ -28,12 +28,12 @@ final class MallCatalogService
                 $ids[] = (int) $row['id'];
             }
         }
-        $priceMap = $this->prices->getPriceMinorByProductIds($ids);
+        $priceMap = $this->prices->getPriceByProductIds($ids);
 
         $outItems = [];
         foreach ($items as $row) {
             $id = isset($row['id']) ? (int) $row['id'] : 0;
-            $row['price_minor'] = $priceMap[$id] ?? null;
+            $row['price'] = $priceMap[$id] ?? null;
             $row['currency'] = 'MINOR';
             $outItems[] = $row;
         }
@@ -55,10 +55,10 @@ final class MallCatalogService
             throw $e;
         }
 
-        $priceMap = $this->prices->getPriceMinorByProductIds([$id]);
+        $priceMap = $this->prices->getPriceByProductIds([$id]);
         $qtyMap = $this->inventory->getQuantityByProductIds([$id]);
 
-        $row['price_minor'] = $priceMap[$id] ?? null;
+        $row['price'] = $priceMap[$id] ?? null;
         $row['currency'] = 'MINOR';
         $row['stock_quantity'] = $qtyMap[$id] ?? 0;
 

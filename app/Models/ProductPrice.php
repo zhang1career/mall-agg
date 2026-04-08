@@ -9,29 +9,29 @@ use Illuminate\Database\Eloquent\Model;
 
 /**
  * @property int $id
- * @property int $product_id
- * @property int $price_minor
+ * @property int $pid CMS product id
+ * @property int $price Price in minor units (e.g. cents)
  * @property int $ct
  * @property int $ut
  */
-class MallProductPrice extends Model
+class ProductPrice extends Model
 {
     use HasMillisTimestamps;
 
     public $timestamps = false;
 
-    protected $table = 'mall_product_price';
+    protected $table = 'product_price';
 
     protected $fillable = [
-        'product_id',
-        'price_minor',
+        'pid',
+        'price',
         'ct',
         'ut',
     ];
 
     protected $casts = [
-        'product_id' => 'integer',
-        'price_minor' => 'integer',
+        'pid' => 'integer',
+        'price' => 'integer',
         'ct' => 'integer',
         'ut' => 'integer',
     ];

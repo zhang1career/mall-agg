@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Mall;
 
-use App\Models\MallProductInventory;
+use App\Models\ProductInventory;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -13,7 +13,7 @@ final class ProductInventoryService
 {
     /**
      * @param  list<int>  $productIds
-     * @return array<int, int> product_id => quantity
+     * @return array<int, int> pid => quantity
      */
     public function getQuantityByProductIds(array $productIds): array
     {
@@ -21,23 +21,23 @@ final class ProductInventoryService
             return [];
         }
 
-        $rows = MallProductInventory::query()
-            ->whereIn('product_id', $productIds)
-            ->get(['product_id', 'quantity']);
+        $rows = ProductInventory::query()
+            ->whereIn('pid', $productIds)
+            ->get(['pid', 'quantity']);
 
         $map = [];
         foreach ($rows as $row) {
-            $map[(int) $row->product_id] = (int) $row->quantity;
+            $map[(int) $row->pid] = (int) $row->quantity;
         }
 
         return $map;
     }
 
-    public function upsertQuantity(int $productId, int $quantity): MallProductInventory
+    public function upsertQuantity(int $productId, int $quantity): ProductInventory
     {
-        $row = MallProductInventory::query()->where('product_id', $productId)->first();
+        $row = ProductInventory::query()->where('pid', $productId)->first();
         if ($row === null) {
-            $row = new MallProductInventory(['product_id' => $productId]);
+            $row = new ProductInventory(['pid' => $productId]);
         }
         $row->quantity = $quantity;
         $row->save();
@@ -47,7 +47,7 @@ final class ProductInventoryService
 
     public function deleteForProduct(int $productId): void
     {
-        MallProductInventory::query()->where('product_id', $productId)->delete();
+        ProductInventory::query()->where('pid', $productId)->delete();
     }
 
     /**
@@ -62,8 +62,8 @@ final class ProductInventoryService
         }
 
         DB::transaction(function () use ($productId, $decrement): void {
-            $row = MallProductInventory::query()
-                ->where('product_id', $productId)
+            $row = ProductInventory::query()
+                ->where('pid', $productId)
                 ->lockForUpdate()
                 ->first();
 
@@ -87,8 +87,8 @@ final class ProductInventoryService
         }
 
         DB::transaction(function () use ($productId, $increment): void {
-            $row = MallProductInventory::query()
-                ->where('product_id', $productId)
+            $row = ProductInventory::query()
+                ->where('pid', $productId)
                 ->lockForUpdate()
                 ->first();
 
@@ -101,15 +101,15 @@ final class ProductInventoryService
         });
     }
 
-    public function lockForUpdateOrFail(int $productId): MallProductInventory
+    public function lockForUpdateOrFail(int $productId): ProductInventory
     {
-        $row = MallProductInventory::query()
-            ->where('product_id', $productId)
+        $row = ProductInventory::query()
+            ->where('pid', $productId)
             ->lockForUpdate()
             ->first();
 
         if ($row === null) {
-            throw (new ModelNotFoundException)->setModel(MallProductInventory::class, [$productId]);
+            throw (new ModelNotFoundException)->setModel(ProductInventory::class, [$productId]);
         }
 
         return $row;

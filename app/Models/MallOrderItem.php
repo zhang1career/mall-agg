@@ -10,10 +10,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property int $id
- * @property int $order_id
- * @property int $product_id
+ * @property int $oid References order.id
+ * @property int $pid CMS product id
  * @property int $quantity
- * @property int $unit_price_minor
+ * @property int $unit_price Snapshot unit price (minor units)
  * @property int $ct
  * @property int $ut
  */
@@ -23,22 +23,22 @@ class MallOrderItem extends Model
 
     public $timestamps = false;
 
-    protected $table = 'mall_order_item';
+    protected $table = 'order_item';
 
     protected $fillable = [
-        'order_id',
-        'product_id',
+        'oid',
+        'pid',
         'quantity',
-        'unit_price_minor',
+        'unit_price',
         'ct',
         'ut',
     ];
 
     protected $casts = [
-        'order_id' => 'integer',
-        'product_id' => 'integer',
+        'oid' => 'integer',
+        'pid' => 'integer',
         'quantity' => 'integer',
-        'unit_price_minor' => 'integer',
+        'unit_price' => 'integer',
         'ct' => 'integer',
         'ut' => 'integer',
     ];
@@ -48,6 +48,6 @@ class MallOrderItem extends Model
      */
     public function order(): BelongsTo
     {
-        return $this->belongsTo(MallOrder::class, 'order_id');
+        return $this->belongsTo(MallOrder::class, 'oid');
     }
 }
