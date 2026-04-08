@@ -3,8 +3,6 @@
 @section('title', 'Edit product')
 
 @section('content')
-    <h1 class="h3 mb-3">Edit product #{{ $product['id'] ?? '' }}</h1>
-
     <form method="post" action="{{ route('admin.products.update', $product['id']) }}" class="bg-white shadow-sm p-4 rounded">
         @csrf
         @method('PUT')
@@ -18,21 +16,11 @@
             <textarea name="description" class="form-control"
                       rows="3">{{ old('description', $product['description'] ?? '') }}</textarea>
         </div>
-        <div class="mb-3">
-            <label class="form-label">Thumbnail URL</label>
-            <input name="thumbnail" type="text" class="form-control"
-                   value="{{ old('thumbnail', $product['thumbnail'] ?? '') }}">
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Main media</label>
-            <input name="main_media" type="text" class="form-control"
-                   value="{{ old('main_media', $product['main_media'] ?? '') }}">
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Ext media</label>
-            <input name="ext_media" type="text" class="form-control"
-                   value="{{ old('ext_media', $product['ext_media'] ?? '') }}">
-        </div>
+        @include('admin.products.partials.media-upload', [
+            'thumbnail' => old('thumbnail', $product['thumbnail'] ?? ''),
+            'main_media' => old('main_media', $product['main_media'] ?? ''),
+            'ext_media' => old('ext_media', $product['ext_media'] ?? ''),
+        ])
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label class="form-label">Price (minor units)</label>

@@ -3,8 +3,7 @@
 @section('title', 'Products')
 
 @section('content')
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1 class="h3">Products</h1>
+    <div class="d-flex justify-content-end mb-3">
         <a href="{{ route('admin.products.create') }}" class="btn btn-primary">New product</a>
     </div>
 

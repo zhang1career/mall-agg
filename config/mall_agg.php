@@ -4,9 +4,9 @@ use App\Services\Mall\Aggregation\LocalProductInventoryProvider;
 use App\Services\Mall\Aggregation\LocalProductPriceProvider;
 
 /**
- * Single source for serv-fd base URL: SERV_FD_BASE_URL (falls back to USER_CENTER_BASE_URL).
+ * Single source for serv-fd base URL: SERV_FD_BASE_URL (falls back).
  */
-$servFdBaseUrl = (string) env('SERV_FD_BASE_URL', env('USER_CENTER_BASE_URL', ''));
+$servFdBaseUrl = env('SERV_FD_BASE_URL');
 
 return [
     /*
@@ -21,7 +21,7 @@ return [
 
     'serv_fd' => [
         'base_url' => $servFdBaseUrl,
-        'timeout_seconds' => (int) env('SERV_FD_TIMEOUT_SECONDS', env('USER_CENTER_TIMEOUT_SECONDS', 3)),
+        'timeout_seconds' => (int) env('SERV_FD_TIMEOUT_SECONDS', 3),
     ],
 
     'cms' => [
@@ -31,12 +31,6 @@ return [
     'foundation' => [
         'base_url' => $servFdBaseUrl,
         'me_endpoint' => env('USER_CENTER_ME_ENDPOINT', '/api/user/me'),
-        'login_endpoint' => env('USER_CENTER_LOGIN_ENDPOINT', '/api/user/login'),
-        'refresh_endpoint' => env('USER_CENTER_REFRESH_ENDPOINT', '/api/user/login'),
-        'register_endpoint' => env('USER_CENTER_REGISTER_ENDPOINT', '/api/user/register'),
-        'register_verify_endpoint' => env('USER_CENTER_REGISTER_VERIFY_ENDPOINT', '/api/user/register/verify'),
-        'reset_password_request_endpoint' => env('USER_CENTER_RESET_PASSWORD_ENDPOINT', '/api/user/reset-password'),
-        'reset_password_verify_endpoint' => env('USER_CENTER_RESET_PASSWORD_VERIFY_ENDPOINT', '/api/user/reset-password/verify'),
         'timeout_seconds' => (int) env('USER_CENTER_TIMEOUT_SECONDS', 3),
         'unauthorized_code' => (int) env('USER_CENTER_UNAUTHORIZED_CODE', 40101),
     ],

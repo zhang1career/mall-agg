@@ -3,8 +3,6 @@
 @section('title', 'Orders')
 
 @section('content')
-    <h1 class="h3 mb-3">Orders</h1>
-
     <table class="table table-striped bg-white shadow-sm">
         <thead>
         <tr>

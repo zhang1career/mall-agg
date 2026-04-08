@@ -3,8 +3,6 @@
 @section('title', 'Order '.$order->id)
 
 @section('content')
-    <h1 class="h3 mb-3">Order #{{ $order->id }}</h1>
-
     <div class="bg-white shadow-sm p-4 rounded mb-4">
         <p><strong>Uid:</strong> {{ $order->uid }}</p>
         <p><strong>Status:</strong> {{ $order->status->value }}</p>

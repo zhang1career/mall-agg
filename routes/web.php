@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AdminOrderController;
 use App\Http\Controllers\Admin\AdminProductController;
+use App\Http\Controllers\Admin\AdminUploadController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', static function () {
@@ -9,6 +10,7 @@ Route::get('/', static function () {
 });
 
 Route::prefix('admin')->name('admin.')->group(function () {
+    Route::post('uploads', [AdminUploadController::class, 'store'])->name('uploads.store');
     Route::resource('products', AdminProductController::class)->except(['show']);
     Route::get('orders', [AdminOrderController::class, 'index'])->name('orders.index');
     Route::get('orders/{id}', [AdminOrderController::class, 'show'])->name('orders.show');
