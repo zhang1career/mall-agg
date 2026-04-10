@@ -75,13 +75,17 @@ class MallOrderController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'status' => 'required|string',
+            'status' => 'required',
         ]);
         if ($validator->fails()) {
             return response()->json(ApiResponse::error(100, $validator->errors()->first()), 422);
         }
 
-        $raw = (string) $request->input('status');
+        $raw = $request->input('status');
+        if (! is_string($raw) && ! is_int($raw)) {
+            return response()->json(ApiResponse::error(100, 'Invalid status.'), 422);
+        }
+
         try {
             $next = MallOrderStatus::fromClient($raw);
         } catch (ValueError) {

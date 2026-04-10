@@ -452,8 +452,9 @@
                         "description": "Foundation 用户 ID"
                     },
                     "status": {
-                        "type": "string",
-                        "enum": ["pending", "paid", "cancelled"]
+                        "type": "integer",
+                        "enum": [0, 1, 2],
+                        "description": "0=pending，1=paid，2=cancelled"
                     },
                     "total_price": { "type": "integer" },
                     "ct": { "type": "integer",
@@ -475,8 +476,9 @@
                     "id": { "type": "integer" },
                     "uid": { "type": "integer" },
                     "status": {
-                        "type": "string",
-                        "enum": ["pending", "paid", "cancelled"]
+                        "type": "integer",
+                        "enum": [0, 1, 2],
+                        "description": "0=pending，1=paid，2=cancelled"
                     },
                     "total_price": { "type": "integer" },
                     "ct": { "type": "integer" },
@@ -523,8 +525,11 @@
                 "required": ["status"],
                 "properties": {
                     "status": {
-                        "type": "string",
-                        "description": "订单状态迁移。可用：`pending`、`paid`、`cancelled`；别名：`init`→`pending`，`cancel`→`cancelled`（大小写不敏感）。非法值返回 422。"
+                        "oneOf": [
+                            { "type": "integer", "enum": [0, 1, 2] },
+                            { "type": "string", "description": "与整数等价：`pending`、`paid`、`cancelled`；别名：`init`→pending，`cancel`→cancelled（大小写不敏感）。也可传数字字符串如 `\"1\"`。" }
+                        ],
+                        "description": "目标状态：0=pending，1=paid，2=cancelled。字符串或整数均可；非法值返回 422。"
                     }
                 }
             }

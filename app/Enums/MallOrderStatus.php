@@ -4,18 +4,29 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
-enum MallOrderStatus: string
+use ValueError;
+
+enum MallOrderStatus: int
 {
-    case Pending = 'pending';
-    case Paid = 'paid';
-    case Cancelled = 'cancelled';
+    case Pending = 0;
+    case Paid = 1;
+    case Cancelled = 2;
 
     /**
-     * @return list<string>
+     * @return list<int>
      */
     public static function values(): array
     {
         return array_column(self::cases(), 'value');
+    }
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::Pending => 'pending',
+            self::Paid => 'paid',
+            self::Cancelled => 'cancelled',
+        };
     }
 
     public function canTransitionTo(self $next): bool
@@ -27,9 +38,22 @@ enum MallOrderStatus: string
         };
     }
 
-    public static function fromClient(string $value): self
+    public static function fromClient(string|int $value): self
     {
-        $normalized = strtolower(trim($value));
+        if (is_int($value)) {
+            return self::from($value);
+        }
+
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            throw new ValueError('Empty MallOrderStatus.');
+        }
+
+        if (ctype_digit($trimmed)) {
+            return self::from((int) $trimmed);
+        }
+
+        $normalized = strtolower($trimmed);
         if ($normalized === 'init') {
             return self::Pending;
         }
@@ -37,6 +61,11 @@ enum MallOrderStatus: string
             return self::Cancelled;
         }
 
-        return self::from($normalized);
+        return match ($normalized) {
+            'pending' => self::Pending,
+            'paid' => self::Paid,
+            'cancelled' => self::Cancelled,
+            default => throw new ValueError('Invalid MallOrderStatus: '.$trimmed),
+        };
     }
 }

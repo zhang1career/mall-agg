@@ -58,7 +58,7 @@ class MallOrderControllerTest extends TestCase
 
         $response->assertCreated()
             ->assertJsonPath('errorCode', 0)
-            ->assertJsonPath('data.status', 'pending')
+            ->assertJsonPath('data.status', 0)
             ->assertJsonPath('data.total_price', 200);
 
         $this->assertSame(1, (int) ProductInventory::query()->where('pid', 7)->value('quantity'));

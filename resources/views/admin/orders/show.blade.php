@@ -5,7 +5,7 @@
 @section('content')
     <div class="bg-white shadow-sm p-4 rounded mb-4">
         <p><strong>Uid:</strong> {{ $order->uid }}</p>
-        <p><strong>Status:</strong> {{ $order->status->value }}</p>
+        <p><strong>Status:</strong> {{ $order->status->label() }} ({{ $order->status->value }})</p>
         <p><strong>Total (minor):</strong> {{ $order->total_price }}</p>
         <p><strong>ct / ut (ms):</strong> {{ $order->ct }} / {{ $order->ut }}</p>
     </div>
@@ -36,7 +36,7 @@
         <label class="form-label">Change status</label>
         <select name="status" class="form-select w-auto">
             @foreach($statuses as $st)
-                <option value="{{ $st->value }}" @selected($order->status === $st)>{{ $st->value }}</option>
+                <option value="{{ $st->value }}" @selected($order->status === $st)>{{ $st->label() }}</option>
             @endforeach
         </select>
         <button type="submit" class="btn btn-primary mt-2">Update status</button>

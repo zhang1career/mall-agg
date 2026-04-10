@@ -46,7 +46,7 @@ class AdminOrderController extends Controller
     public function update(Request $request, int $id): RedirectResponse
     {
         $validated = $request->validate([
-            'status' => 'required|string',
+            'status' => 'required',
         ]);
 
         $order = MallOrder::query()->with('items')->find($id);

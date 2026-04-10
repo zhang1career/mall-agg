@@ -19,7 +19,7 @@
             <tr>
                 <td>{{ $order->id }}</td>
                 <td>{{ $order->uid }}</td>
-                <td>{{ $order->status->value }}</td>
+                <td>{{ $order->status->label() }} ({{ $order->status->value }})</td>
                 <td>{{ $order->total_price }}</td>
                 <td>{{ $order->ct }}</td>
                 <td><a href="{{ route('admin.orders.show', $order->id) }}" class="btn btn-sm btn-outline-secondary">View</a></td>

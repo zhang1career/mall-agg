@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * @property int $id
  * @property int $uid Foundation user id (from GET /api/user/me)
- * @property MallOrderStatus $status
+ * @property MallOrderStatus $status Stored as integer (see MallOrderStatus backed values)
  * @property int $total_price Order total in minor units (e.g. cents); denormalized at creation from line items
  * @property int $ct
  * @property int $ut
