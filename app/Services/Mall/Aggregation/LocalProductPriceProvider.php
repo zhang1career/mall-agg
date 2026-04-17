@@ -19,7 +19,7 @@ final class LocalProductPriceProvider implements UserBusinessServiceContract
 
     public function key(): string
     {
-        return 'mall_product_price';
+        return 'product_price';
     }
 
     public function supports(array $context): bool
@@ -41,7 +41,7 @@ final class LocalProductPriceProvider implements UserBusinessServiceContract
         $intIds = array_map(static fn (mixed $v): int => (int) $v, $ids);
 
         return [
-            'prices' => $this->prices->getPriceMinorByProductIds($intIds),
+            'prices' => $this->prices->getPriceByProductIds($intIds),
         ];
     }
 }

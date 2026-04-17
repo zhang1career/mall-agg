@@ -1,0 +1,231 @@
+/**
+ * Mall admin console: layout chrome + theme (aligned with service_foundation console).
+ * Light: 护眼浅绿背景；暗色：html.theme-dark（由 mall-admin.js 切换）
+ */
+
+body {
+    background-color: #dcf5e0;
+}
+
+html.theme-dark body {
+    background-color: #111827;
+}
+
+#console-sidebar {
+    --sidebar-width: 256px;
+}
+
+#sidebar-handle {
+    width: 6px;
+    cursor: col-resize;
+    z-index: 10;
+}
+
+#sidebar-handle:hover,
+#sidebar-handle:active {
+    background: rgba(59, 130, 246, 0.4);
+}
+
+#sidebar-toggle {
+    transition: transform 0.2s ease;
+}
+
+#sidebar-toggle:hover {
+    transform: scale(1.05);
+}
+
+.sidebar-collapsed .sidebar-link {
+    justify-content: center;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+}
+
+.sidebar-collapsed nav ul {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+}
+
+/* Toggle switch (same as service_foundation console) */
+.console-toggle-wrap {
+    position: relative;
+    display: inline-block;
+    width: 2.25rem;
+    height: 1.25rem;
+    vertical-align: middle;
+    flex-shrink: 0;
+}
+
+.console-toggle-input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    margin: 0;
+}
+
+.console-toggle-track {
+    display: block;
+    width: 2.25rem;
+    height: 1.25rem;
+    background: #d1d5db;
+    border-radius: 9999px;
+    transition: background 0.2s;
+    position: relative;
+}
+
+.console-toggle-track::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 1rem;
+    height: 1rem;
+    background: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 9999px;
+    transition: transform 0.2s;
+    box-sizing: border-box;
+}
+
+.console-toggle-input:focus-visible + .console-toggle-track {
+    outline: 2px solid rgba(59, 130, 246, 0.45);
+    outline-offset: 2px;
+}
+
+.console-toggle-input:checked + .console-toggle-track {
+    background: #3b82f6;
+}
+
+.console-toggle-input:checked + .console-toggle-track::after {
+    transform: translateX(1rem);
+    border-color: #fff;
+}
+
+/* Top bar + main (Tailwind utility companions) */
+html.theme-dark .theme-header {
+    background: #1f2937;
+    border-bottom: 1px solid #374151;
+}
+
+html.theme-dark .theme-title {
+    color: #f3f4f6;
+}
+
+html.theme-dark .theme-toggle-icon {
+    color: #9ca3af;
+}
+
+html.theme-dark main.mall-admin-main {
+    background: #111827;
+}
+
+html.theme-dark #console-sidebar {
+    background: #0f172a;
+}
+
+html.theme-dark #console-sidebar .border-gray-700 {
+    border-color: #334155;
+}
+
+html.theme-dark #console-sidebar a:hover {
+    background: #1e293b;
+}
+
+html.theme-dark #console-sidebar a.bg-gray-700,
+html.theme-dark #console-sidebar .sidebar-link.bg-gray-700 {
+    background: #334155;
+}
+
+/* Bootstrap surfaces in dark theme */
+html.theme-dark .bg-white {
+    background-color: #1f2937 !important;
+    color: #e5e7eb;
+}
+
+html.theme-dark .text-muted {
+    color: #9ca3af !important;
+}
+
+html.theme-dark .table {
+    color: #e5e7eb;
+    --bs-table-bg: transparent;
+    --bs-table-striped-bg: rgba(55, 65, 81, 0.5);
+    --bs-table-hover-bg: rgba(55, 65, 81, 0.65);
+    --bs-border-color: #374151;
+}
+
+html.theme-dark .table > :not(caption) > * > * {
+    border-bottom-color: #374151;
+}
+
+html.theme-dark .table thead th {
+    background: #374151;
+    color: #f3f4f6;
+}
+
+html.theme-dark .form-control,
+html.theme-dark .form-select {
+    background-color: #374151;
+    border-color: #4b5563;
+    color: #f3f4f6;
+}
+
+html.theme-dark .form-label {
+    color: #d1d5db;
+}
+
+html.theme-dark .btn-outline-secondary {
+    border-color: #6b7280;
+    color: #e5e7eb;
+}
+
+html.theme-dark .btn-outline-secondary:hover {
+    background: #4b5563;
+    color: #fff;
+}
+
+html.theme-dark .btn-outline-danger {
+    border-color: #b91c1c;
+    color: #fecaca;
+}
+
+html.theme-dark .btn-outline-danger:hover {
+    background: #991b1b;
+    color: #fef2f2;
+}
+
+html.theme-dark .btn-link {
+    color: #93c5fd;
+}
+
+html.theme-dark .pagination .page-link {
+    background: #374151;
+    border-color: #4b5563;
+    color: #e5e7eb;
+}
+
+html.theme-dark .pagination .page-item.active .page-link {
+    background: #3b82f6;
+    border-color: #3b82f6;
+}
+
+html.theme-dark .pagination .page-item.disabled .page-link {
+    background: #1f2937;
+    color: #6b7280;
+}
+
+html.theme-dark .alert-success {
+    background: #065f46;
+    border-color: #047857;
+    color: #a7f3d0;
+}
+
+html.theme-dark .alert-danger {
+    background: #7f1d1d;
+    border-color: #991b1b;
+    color: #fecaca;
+}
+
+html.theme-dark h2.h5 {
+    color: #f3f4f6;
+}

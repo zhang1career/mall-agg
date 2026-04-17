@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\MallProductPrice;
+use App\Models\ProductPrice;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -41,9 +41,9 @@ class MallProductControllerTest extends TestCase
             ], 200),
         ]);
 
-        MallProductPrice::query()->create([
-            'product_id' => 1,
-            'price_minor' => 1999,
+        ProductPrice::query()->create([
+            'pid' => 1,
+            'price' => 1999,
             'ct' => 1,
             'ut' => 1,
         ]);
@@ -52,7 +52,7 @@ class MallProductControllerTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('errorCode', 0)
-            ->assertJsonPath('data.items.0.price_minor', 1999)
+            ->assertJsonPath('data.items.0.price', 1999)
             ->assertJsonPath('data.items.0.title', 'A');
     }
 }

@@ -4,39 +4,39 @@ declare(strict_types=1);
 
 namespace App\Services\Mall;
 
-use App\Models\MallProductPrice;
+use App\Models\ProductPrice;
 
 final class ProductPriceService
 {
     /**
      * @param  list<int>  $productIds
-     * @return array<int, int> product_id => price_minor
+     * @return array<int, int> pid => price (minor units)
      */
-    public function getPriceMinorByProductIds(array $productIds): array
+    public function getPriceByProductIds(array $productIds): array
     {
         if ($productIds === []) {
             return [];
         }
 
-        $rows = MallProductPrice::query()
-            ->whereIn('product_id', $productIds)
-            ->get(['product_id', 'price_minor']);
+        $rows = ProductPrice::query()
+            ->whereIn('pid', $productIds)
+            ->get(['pid', 'price']);
 
         $map = [];
         foreach ($rows as $row) {
-            $map[(int) $row->product_id] = (int) $row->price_minor;
+            $map[(int) $row->pid] = (int) $row->price;
         }
 
         return $map;
     }
 
-    public function upsertPrice(int $productId, int $priceMinor): MallProductPrice
+    public function upsertPrice(int $productId, int $price): ProductPrice
     {
-        $row = MallProductPrice::query()->where('product_id', $productId)->first();
+        $row = ProductPrice::query()->where('pid', $productId)->first();
         if ($row === null) {
-            $row = new MallProductPrice(['product_id' => $productId]);
+            $row = new ProductPrice(['pid' => $productId]);
         }
-        $row->price_minor = $priceMinor;
+        $row->price = $price;
         $row->save();
 
         return $row;
@@ -44,6 +44,6 @@ final class ProductPriceService
 
     public function deleteForProduct(int $productId): void
     {
-        MallProductPrice::query()->where('product_id', $productId)->delete();
+        ProductPrice::query()->where('pid', $productId)->delete();
     }
 }
