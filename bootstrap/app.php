@@ -8,8 +8,9 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use Paganini\Env\LayeredEnvLoader;
 
-return Application::configure(basePath: dirname(__DIR__))
+$app = Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
@@ -52,3 +53,20 @@ return Application::configure(basePath: dirname(__DIR__))
             );
         });
     })->create();
+
+$app->afterLoadingEnvironment(function ($application): void {
+    $seg = getenv('APP_ENV');
+    if ($seg === false || $seg === '') {
+        return;
+    }
+    $seg = trim($seg);
+    if (! in_array($seg, ['dev', 'test', 'prod'], true)) {
+        return;
+    }
+    LayeredEnvLoader::loadEnvironmentOverlay(
+        $application->environmentPath(),
+        $application->environmentFile()
+    );
+});
+
+return $app;

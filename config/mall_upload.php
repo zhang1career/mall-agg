@@ -1,6 +1,7 @@
 <?php
 
-$servFd = trim((string) env('SERV_FD_BASE_URL'));
+$apiGateway = trim((string) env('API_GATEWAY_BASE_URL', ''));
+$servFd = $apiGateway !== '' ? $apiGateway : trim((string) env('SERV_FD_BASE_URL', ''));
 $explicitOss = trim((string) env('MALL_OSS_UPLOAD_BASE_URL'));
 if ($explicitOss) {
     $ossBaseUrl = rtrim($explicitOss, '/');
@@ -20,7 +21,7 @@ return [
     |--------------------------------------------------------------------------
     | Foundation OSS HTTP API (same stack as Django USER_OSS_ENDPOINT)
     |--------------------------------------------------------------------------
-    | Defaults to {SERV_FD_BASE_URL}/api/oss when MALL_OSS_UPLOAD_BASE_URL is unset.
+    | Defaults to {API_GATEWAY_BASE_URL or SERV_FD_BASE_URL}/api/oss when MALL_OSS_UPLOAD_BASE_URL is unset.
     */
     'oss_base_url' => $ossBaseUrl,
 

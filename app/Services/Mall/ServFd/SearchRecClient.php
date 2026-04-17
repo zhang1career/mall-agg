@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Mall\ServFd;
 
+use App\Services\User\ResolvedFoundationBaseUrl;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Paganini\Aggregation\Exceptions\DownstreamServiceException;
@@ -23,7 +24,9 @@ final class SearchRecClient
 
     public static function fromConfig(): self
     {
-        $base = rtrim((string) config('mall_agg.serv_fd.searchrec.base_url', ''), '/');
+        $base = app(ResolvedFoundationBaseUrl::class)->resolveRaw(
+            (string) config('mall_agg.serv_fd.searchrec.base_url', '')
+        );
         $key = (string) config('mall_agg.serv_fd.searchrec.access_key', '');
         $timeout = (int) config('mall_agg.serv_fd.searchrec.timeout_seconds', 5);
 

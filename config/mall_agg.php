@@ -3,10 +3,9 @@
 use App\Services\Mall\Aggregation\LocalProductInventoryProvider;
 use App\Services\Mall\Aggregation\LocalProductPriceProvider;
 
-/**
- * Single source for serv-fd base URL: SERV_FD_BASE_URL (falls back).
- */
-$servFdBaseUrl = env('SERV_FD_BASE_URL');
+$apiGatewayRaw = trim((string) env('API_GATEWAY_BASE_URL', ''));
+$servFdRaw = trim((string) env('SERV_FD_BASE_URL', ''));
+$servFdBaseUrl = $apiGatewayRaw !== '' ? $apiGatewayRaw : $servFdRaw;
 
 return [
     /*
@@ -24,7 +23,7 @@ return [
         'timeout_seconds' => (int) env('SERV_FD_TIMEOUT_SECONDS', 3),
 
         'searchrec' => [
-            'base_url' => $servFdBaseUrl . '/api/searchrec',
+            'base_url' => $servFdBaseUrl.'/api/searchrec',
             'access_key' => (string) env('MALL_SEARCHREC_ACCESS_KEY', ''),
             'timeout_seconds' => (int) env('MALL_SEARCHREC_TIMEOUT_SECONDS', 5),
         ],
@@ -35,7 +34,16 @@ return [
     ],
 
     'foundation' => [
-        'base_url' => $servFdBaseUrl,
+        'base_url' => env('API_GATEWAY_BASE_URL', ''),
+        /*
+         * When `base_url` contains `://{{service_key}}` (Fusio-style), resolve via Redis (paganini).
+         * Plain URLs skip Redis entirely.
+         */
+        'service_discovery' => [
+            'memo_ttl_seconds' => (int) env('API_GATEWAY_SD_MEMO_TTL', 60),
+            'redis_connection' => env('API_GATEWAY_SD_DB_CONN', 'default'),
+            'redis_key_prefix' => env('API_GATEWAY_SD_KEY_PREFIX', ''),
+        ],
         'me_endpoint' => env('USER_CENTER_ME_ENDPOINT', '/api/user/me'),
         'timeout_seconds' => (int) env('USER_CENTER_TIMEOUT_SECONDS', 3),
         'unauthorized_code' => (int) env('USER_CENTER_UNAUTHORIZED_CODE', 40101),

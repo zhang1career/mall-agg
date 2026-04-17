@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Mall;
 
+use App\Services\User\ResolvedFoundationBaseUrl;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -15,6 +16,10 @@ use RuntimeException;
  */
 final class MallOssUploadService
 {
+    public function __construct(
+        private readonly ResolvedFoundationBaseUrl $resolvedFoundationBaseUrl,
+    ) {}
+
     /**
      * @return non-empty-string Object key stored in CMS (e.g. mall/products/{uuid}.jpg)
      */
@@ -29,12 +34,12 @@ final class MallOssUploadService
         $pathId = (string) Str::uuid();
         $objectKey = $prefix.'/'.$pathId.'.'.$extension;
 
-        $base = trim((string) config('mall_upload.oss_base_url'), '/');
+        $base = $this->resolvedFoundationBaseUrl->resolveRaw(trim((string) config('mall_upload.oss_base_url'), '/'));
         $bucket = trim((string) config('mall_upload.oss_bucket'), '/');
 
         if ($base === '' || $bucket === '') {
             throw new RuntimeException(
-                'OSS upload is not configured: set SERV_FD_BASE_URL (or MALL_OSS_UPLOAD_BASE_URL) and MALL_OSS_BUCKET.'
+                'OSS upload is not configured: set API_GATEWAY_BASE_URL or SERV_FD_BASE_URL (or MALL_OSS_UPLOAD_BASE_URL) and MALL_OSS_BUCKET.'
             );
         }
 

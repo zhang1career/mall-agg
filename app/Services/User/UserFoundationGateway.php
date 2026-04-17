@@ -12,9 +12,13 @@ use RuntimeException;
 
 class UserFoundationGateway
 {
+    public function __construct(
+        private readonly ResolvedFoundationBaseUrl $resolvedFoundationBaseUrl,
+    ) {}
+
     public function fetchCurrentUser(Request $request): array
     {
-        $baseUrl = rtrim((string) config('mall_agg.foundation.base_url'), '/');
+        $baseUrl = $this->resolvedFoundationBaseUrl->resolve();
         if ($baseUrl === '') {
             throw new RuntimeException('Missing user foundation base_url configuration.');
         }

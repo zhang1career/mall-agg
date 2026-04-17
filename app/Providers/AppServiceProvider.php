@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Infrastructure\ServiceDiscovery\LaravelRedisStringClient;
 use App\Queue\Connectors\DatabaseMillisConnector;
 use App\Queue\Failed\DatabaseUuidFailedJobProviderMillis;
 use App\Services\Mall\MallCatalogService;
@@ -10,9 +11,16 @@ use App\Services\Mall\ProductInventoryService;
 use App\Services\Mall\ProductPriceService;
 use App\Services\Mall\ServFd\CmsProductClient;
 use App\Services\Mall\ServFd\SearchRecClient;
+use App\Services\User\ResolvedFoundationBaseUrl;
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\ServiceProvider;
 use Paganini\Capability\ProviderRegistry;
+use Paganini\Memo\ApcuMemoStore;
+use Paganini\Memo\ArrayMemoStore;
+use Paganini\Memo\Memoizer;
+use Paganini\ServiceDiscovery\Contracts\ServiceUriResolverInterface;
+use Paganini\ServiceDiscovery\RedisServiceUriResolver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -21,6 +29,33 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->singleton(LaravelRedisStringClient::class, function (Application $app) {
+            $conn = (string) config('mall_agg.foundation.service_discovery.redis_connection', 'default');
+
+            return new LaravelRedisStringClient($app['redis']->connection($conn));
+        });
+
+        $this->app->singleton(ServiceUriResolverInterface::class, function (Application $app) {
+            return new RedisServiceUriResolver(
+                $app->make(LaravelRedisStringClient::class),
+                (string) config('mall_agg.foundation.service_discovery.redis_key_prefix', '')
+            );
+        });
+
+        $this->app->singleton(ResolvedFoundationBaseUrl::class, function (Application $app) {
+            $ttl = (int) config('mall_agg.foundation.service_discovery.memo_ttl_seconds', 60);
+            if ($ttl < 0) {
+                $ttl = 0;
+            }
+            $store = \function_exists('apcu_fetch') ? new ApcuMemoStore('mall_agg.foundation_base') : new ArrayMemoStore;
+
+            return new ResolvedFoundationBaseUrl(
+                $app,
+                new Memoizer($store),
+                $ttl
+            );
+        });
+
         $this->app->singleton(CmsProductClient::class, fn () => CmsProductClient::fromConfig());
         $this->app->singleton(SearchRecClient::class, fn () => SearchRecClient::fromConfig());
         $this->app->singleton(ProductPriceService::class);
