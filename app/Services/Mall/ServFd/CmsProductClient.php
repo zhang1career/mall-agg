@@ -24,13 +24,11 @@ final class CmsProductClient
 
     public static function fromConfig(): self
     {
-        $base = app(ResolvedFoundationBaseUrl::class)->resolveRaw(
-            (string) config('mall_agg.serv_fd.base_url', '')
-        );
+        $base = app(ResolvedFoundationBaseUrl::class)->resolve();
         $route = (string) config('mall_agg.cms.content_route', 'product');
         $timeout = (int) config('mall_agg.serv_fd.timeout_seconds', 3);
         if ($base === '') {
-            throw new RuntimeException('Missing mall_agg.serv_fd.base_url (API_GATEWAY_BASE_URL or SERV_FD_BASE_URL).');
+            throw new RuntimeException('Missing API gateway base URL (API_GATEWAY_BASE_URL).');
         }
 
         return new self($base, $route, $timeout);

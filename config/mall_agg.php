@@ -3,10 +3,6 @@
 use App\Services\Mall\Aggregation\LocalProductInventoryProvider;
 use App\Services\Mall\Aggregation\LocalProductPriceProvider;
 
-$apiGatewayRaw = trim((string) env('API_GATEWAY_BASE_URL', ''));
-$servFdRaw = trim((string) env('SERV_FD_BASE_URL', ''));
-$servFdBaseUrl = $apiGatewayRaw !== '' ? $apiGatewayRaw : $servFdRaw;
-
 return [
     /*
     | api.log_http_errors: 记录所有 api/* 且 HTTP 状态为 4xx、5xx 的响应（含转发下游的「非异常」错误）。
@@ -19,13 +15,11 @@ return [
     ],
 
     'serv_fd' => [
-        'base_url' => $servFdBaseUrl,
-        'timeout_seconds' => (int) env('SERV_FD_TIMEOUT_SECONDS', 3),
+        'timeout_seconds' => (int) env('API_GATEWAY_TIMEOUT_SECONDS', 3),
 
         'searchrec' => [
-            'base_url' => $servFdBaseUrl.'/api/searchrec',
             'access_key' => (string) env('MALL_SEARCHREC_ACCESS_KEY', ''),
-            'timeout_seconds' => (int) env('MALL_SEARCHREC_TIMEOUT_SECONDS', 5),
+            'timeout_seconds' => 5,
         ],
     ],
 
@@ -44,9 +38,9 @@ return [
             'redis_connection' => env('API_GATEWAY_SD_DB_CONN', 'default'),
             'redis_key_prefix' => env('API_GATEWAY_SD_KEY_PREFIX', ''),
         ],
-        'me_endpoint' => env('USER_CENTER_ME_ENDPOINT', '/api/user/me'),
-        'timeout_seconds' => (int) env('USER_CENTER_TIMEOUT_SECONDS', 3),
-        'unauthorized_code' => (int) env('USER_CENTER_UNAUTHORIZED_CODE', 40101),
+        'me_endpoint' => '/api/user/me',
+        'timeout_seconds' => 3,
+        'unauthorized_code' => 40101,
     ],
 
     /*

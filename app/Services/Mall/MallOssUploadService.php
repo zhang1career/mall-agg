@@ -34,12 +34,12 @@ final class MallOssUploadService
         $pathId = (string) Str::uuid();
         $objectKey = $prefix.'/'.$pathId.'.'.$extension;
 
-        $base = $this->resolvedFoundationBaseUrl->resolveRaw(trim((string) config('mall_upload.oss_base_url'), '/'));
+        $base = $this->resolvedFoundationBaseUrl->resolvePathSuffix('/api/oss');
         $bucket = trim((string) config('mall_upload.oss_bucket'), '/');
 
         if ($base === '' || $bucket === '') {
             throw new RuntimeException(
-                'OSS upload is not configured: set API_GATEWAY_BASE_URL or SERV_FD_BASE_URL (or MALL_OSS_UPLOAD_BASE_URL) and MALL_OSS_BUCKET.'
+                'OSS upload is not configured: set API_GATEWAY_BASE_URL and MALL_OSS_BUCKET.'
             );
         }
 

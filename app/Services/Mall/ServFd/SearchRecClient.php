@@ -24,9 +24,7 @@ final class SearchRecClient
 
     public static function fromConfig(): self
     {
-        $base = app(ResolvedFoundationBaseUrl::class)->resolveRaw(
-            (string) config('mall_agg.serv_fd.searchrec.base_url', '')
-        );
+        $base = app(ResolvedFoundationBaseUrl::class)->resolvePathSuffix('/api/searchrec');
         $key = (string) config('mall_agg.serv_fd.searchrec.access_key', '');
         $timeout = (int) config('mall_agg.serv_fd.searchrec.timeout_seconds', 5);
 

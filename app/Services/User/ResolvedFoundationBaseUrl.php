@@ -26,7 +26,7 @@ final class ResolvedFoundationBaseUrl
     ) {}
 
     /**
-     * Trimmed base URL, or empty string if unset.
+     * Trimmed gateway base URL, or empty string if unset.
      */
     public function resolve(): string
     {
@@ -55,30 +55,16 @@ final class ResolvedFoundationBaseUrl
     }
 
     /**
-     * Same resolution rules as {@see resolve()} for a raw URL from another config (e.g. mall_upload OSS base, serv-fd clients).
+     * Resolved gateway base with a path suffix (e.g. `/api/searchrec`, `/api/oss`). Empty if gateway base is unset.
      */
-    public function resolveRaw(string $raw): string
+    public function resolvePathSuffix(string $path): string
     {
-        if ($raw === '') {
+        $base = $this->resolve();
+        if ($base === '') {
             return '';
         }
-        if (! str_contains($raw, '://{{')) {
-            return rtrim($raw, '/');
-        }
+        $path = '/'.ltrim($path, '/');
 
-        $cacheKey = 'mall_agg:foundation_base:'.CacheKeyGenerator::fromAssociativeArray(['u' => $raw]);
-
-        return rtrim(
-            $this->memoizer->getOrCompute(
-                $cacheKey,
-                $this->memoTtlSeconds,
-                fn (): string => ServiceUrlSpecifier::specifyHost(
-                    $raw,
-                    $this->app->make(ServiceUriResolverInterface::class),
-                    null
-                )
-            ),
-            '/'
-        );
+        return $base.$path;
     }
 }
