@@ -14,5 +14,5 @@ return [
     | OSS API base is runtime {API_GATEWAY_BASE_URL}/api/oss (see MallOssUploadService).
     |--------------------------------------------------------------------------
     */
-    'oss_bucket' => trim((string) env('MALL_OSS_BUCKET', 'mall'), '/'),
+    'oss_bucket' => trim((string) env('MALL_OSS_BUCKET', ''), '/'),
 ];

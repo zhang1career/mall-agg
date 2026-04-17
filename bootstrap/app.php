@@ -54,6 +54,7 @@ $app = Application::configure(basePath: dirname(__DIR__))
         });
     })->create();
 
+// Base `.env` is loaded by Laravel; optional `.env.{dev|test|prod}` overlay (paganini), aligned with user-agg.
 $app->afterLoadingEnvironment(function ($application): void {
     $seg = getenv('APP_ENV');
     if ($seg === false || $seg === '') {

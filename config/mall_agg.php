@@ -24,7 +24,7 @@ return [
     ],
 
     'cms' => [
-        'content_route' => env('MALL_CMS_CONTENT_ROUTE', 'product'),
+        'content_route' => env('MALL_CMS_CONTENT_ROUTE', ''),
     ],
 
     'foundation' => [
