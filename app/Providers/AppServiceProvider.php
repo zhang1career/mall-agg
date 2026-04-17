@@ -9,6 +9,7 @@ use App\Services\Mall\OrderCommandService;
 use App\Services\Mall\ProductInventoryService;
 use App\Services\Mall\ProductPriceService;
 use App\Services\Mall\ServFd\CmsProductClient;
+use App\Services\Mall\ServFd\SearchRecClient;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\ServiceProvider;
 use Paganini\Capability\ProviderRegistry;
@@ -21,6 +22,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(CmsProductClient::class, fn () => CmsProductClient::fromConfig());
+        $this->app->singleton(SearchRecClient::class, fn () => SearchRecClient::fromConfig());
         $this->app->singleton(ProductPriceService::class);
         $this->app->singleton(ProductInventoryService::class);
         $this->app->singleton(OrderCommandService::class);

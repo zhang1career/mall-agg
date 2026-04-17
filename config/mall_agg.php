@@ -22,6 +22,12 @@ return [
     'serv_fd' => [
         'base_url' => $servFdBaseUrl,
         'timeout_seconds' => (int) env('SERV_FD_TIMEOUT_SECONDS', 3),
+
+        'searchrec' => [
+            'base_url' => $servFdBaseUrl . '/api/searchrec',
+            'access_key' => (string) env('MALL_SEARCHREC_ACCESS_KEY', ''),
+            'timeout_seconds' => (int) env('MALL_SEARCHREC_TIMEOUT_SECONDS', 5),
+        ],
     ],
 
     'cms' => [

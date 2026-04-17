@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Services\Mall\ProductInventoryService;
 use App\Services\Mall\ProductPriceService;
 use App\Services\Mall\ServFd\CmsProductClient;
+use App\Services\Mall\ServFd\SearchRecClient;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -17,6 +18,7 @@ class AdminProductController extends Controller
 {
     public function __construct(
         private readonly CmsProductClient $cms,
+        private readonly SearchRecClient $searchRec,
         private readonly ProductPriceService $prices,
         private readonly ProductInventoryService $inventory,
     ) {}
@@ -92,6 +94,13 @@ class AdminProductController extends Controller
             $this->inventory->upsertQuantity($id, (int) $validated['quantity']);
         }
 
+        try {
+            $this->searchRec->upsertProduct($id, $fields);
+        } catch (DownstreamServiceException $e) {
+            return redirect()->route('admin.products.edit', $id)
+                ->withErrors(['searchrec' => $e->getMessage()]);
+        }
+
         return redirect()->route('admin.products.edit', $id)
             ->with('status', 'Product created.');
     }
@@ -145,6 +154,12 @@ class AdminProductController extends Controller
         }
         if (array_key_exists('quantity', $validated) && $validated['quantity'] !== null) {
             $this->inventory->upsertQuantity($product, (int) $validated['quantity']);
+        }
+
+        try {
+            $this->searchRec->upsertProduct($product, $fields);
+        } catch (DownstreamServiceException $e) {
+            return back()->withInput()->withErrors(['searchrec' => $e->getMessage()]);
         }
 
         return redirect()->route('admin.products.edit', $product)

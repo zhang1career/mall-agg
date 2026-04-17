@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "mall-agg 用户端 API",
-    "description": "聚合服务对外 HTTP JSON 接口（`routes/api.php`）。业务响应统一为 `ApiResponse` 信封：`data`、`errorCode`、`message`、`_req_id`。成功时 `errorCode` 为 `0`；失败时 `data` 常为空字符串。",
+    "description": "聚合服务对外 HTTP JSON 接口（`routes/api.php`）。业务响应统一为 `ApiResponse` 信封：`data`、`errorCode`、`message`、`_req_id`。成功时 `errorCode` 为 `0`；失败时 `data` 常为空字符串。\n\n管理后台创建/更新商品时，服务端会**同步**调用下游 SearchRec `POST {base}/api/searchrec/index/upsert`（`base` 取自 `MALL_SEARCHREC_BASE_URL`，未设时与 `SERV_FD_BASE_URL` 相同；需 `MALL_SEARCHREC_ACCESS_KEY`）。该调用为服务端出站，**不**作为本 OpenAPI 路径对外暴露；请求/响应体见 `service_foundation` 的 `docs/api_searchrec.json`。",
     "version": "1.0.0"
   },
   "servers": [
@@ -57,6 +57,69 @@
           },
           "404": {
             "description": "下游 CMS 不可用或路由不存在等。`errorCode` 如 `40401`。",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiEnvelope" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mall/products/search": {
+      "post": {
+        "tags": ["MallProducts"],
+        "summary": "商品关键词搜索",
+        "description": "聚合层将请求转发至下游 SearchRec（`POST …/api/searchrec/search`），服务端注入 `access_key`（环境变量 `MALL_SEARCHREC_ACCESS_KEY`），客户端勿传。未配置 SearchRec 时返回 503（`errorCode` `50301`）。",
+        "parameters": [
+          { "$ref": "#/components/parameters/TraceId" }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ProductSearchRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功；`data` 为下游检索结果（`items`、`total_hits` 等，与 SearchRec `SearchResult` 对齐）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "errorCode": { "type": "integer", "example": 0 },
+                        "data": { "$ref": "#/components/schemas/ProductSearchResultData" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求体验证失败（`errorCode` 如 `1`）。",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiEnvelope" }
+              }
+            }
+          },
+          "502": {
+            "description": "下游 SearchRec 返回业务错误或 HTTP 失败（`errorCode` 如 `50201`）。",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiEnvelope" }
+              }
+            }
+          },
+          "503": {
+            "description": "未配置 SearchRec（缺 `MALL_SEARCHREC_ACCESS_KEY` 或等价配置；`errorCode` `50301`）。",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ApiEnvelope" }
@@ -531,6 +594,58 @@
                         ],
                         "description": "目标状态：0=pending，1=paid，2=cancelled。字符串或整数均可；非法值返回 422。"
                     }
+                }
+            },
+            "ProductSearchRequest": {
+                "type": "object",
+                "description": "对应下游 `SearchRequest` 中可由客户端提供的字段；`access_key` 由聚合层追加。",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "maxLength": 2000,
+                        "description": "查询串；可省略或空字符串。"
+                    },
+                    "top_k": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100,
+                        "default": 10,
+                        "description": "返回条数上限；未传时默认 10。"
+                    },
+                    "preferred_tags": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "maxLength": 200
+                        },
+                        "description": "偏好标签列表；空串元素会被忽略。"
+                    }
+                }
+            },
+            "SearchHitItem": {
+                "type": "object",
+                "description": "与下游 SearchRec `SearchHit` 一致；可能含 `features` 等扩展字段。",
+                "additionalProperties": true,
+                "properties": {
+                    "id": { "type": "string" },
+                    "title": { "type": "string" },
+                    "tags": {
+                        "type": "array",
+                        "items": { "type": "string" }
+                    },
+                    "score": { "type": "number" }
+                }
+            },
+            "ProductSearchResultData": {
+                "type": "object",
+                "required": ["items", "total_hits"],
+                "description": "与下游 SearchRec `SearchResult` 对齐。",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "items": { "$ref": "#/components/schemas/SearchHitItem" }
+                    },
+                    "total_hits": { "type": "integer" }
                 }
             }
         }

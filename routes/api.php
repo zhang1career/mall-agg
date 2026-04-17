@@ -10,6 +10,7 @@ Route::prefix('')->middleware([])->group(function () {
 
     Route::prefix('mall')->group(function () {
         Route::get('products', [MallProductController::class, 'index']);
+        Route::post('products/search', [MallProductController::class, 'search']);
         Route::get('products/{id}', [MallProductController::class, 'show'])->whereNumber('id');
         Route::post('orders', [MallOrderController::class, 'store']);
         Route::patch('orders/{id}', [MallOrderController::class, 'update'])->whereNumber('id');

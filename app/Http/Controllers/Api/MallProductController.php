@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Components\ApiResponse;
 use App\Http\Controllers\Controller;
 use App\Services\Mall\MallCatalogService;
+use App\Services\Mall\ServFd\SearchRecClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Paganini\Aggregation\Exceptions\DownstreamServiceException;
@@ -15,6 +16,7 @@ class MallProductController extends Controller
 {
     public function __construct(
         private readonly MallCatalogService $catalog,
+        private readonly SearchRecClient $searchRec,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -44,5 +46,40 @@ class MallProductController extends Controller
         $this->logHandledApiRequest($request, ['handler' => 'mall.products.show', 'product_id' => $id]);
 
         return response()->json(ApiResponse::ok($row));
+    }
+
+    public function search(Request $request): JsonResponse
+    {
+        if (! $this->searchRec->isConfigured()) {
+            return response()->json(
+                ApiResponse::error(50301, 'Search service is not configured.'),
+                503
+            );
+        }
+
+        $validated = $request->validate([
+            'query' => 'nullable|string|max:2000',
+            'top_k' => 'nullable|integer|min:1|max:100',
+            'preferred_tags' => 'nullable|array',
+            'preferred_tags.*' => 'string|max:200',
+        ]);
+
+        $query = (string) ($validated['query'] ?? '');
+        $topK = (int) ($validated['top_k'] ?? 10);
+        /** @var list<string> $tags */
+        $tags = array_values(array_filter(
+            $validated['preferred_tags'] ?? [],
+            static fn (string $t) => $t !== ''
+        ));
+
+        try {
+            $data = $this->searchRec->search($query, $topK, $tags);
+        } catch (DownstreamServiceException $e) {
+            return response()->json(ApiResponse::error(50201, $e->getMessage()), 502);
+        }
+
+        $this->logHandledApiRequest($request, ['handler' => 'mall.products.search']);
+
+        return response()->json(ApiResponse::ok($data));
     }
 }
