@@ -2,52 +2,55 @@
 
 declare(strict_types=1);
 
-namespace App\Services\User;
+namespace App\Services\api_gw;
 
+use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Contracts\Foundation\Application;
+use JsonException;
 use Paganini\Memo\CacheKeyGenerator;
 use Paganini\Memo\Memoizer;
 use Paganini\ServiceDiscovery\Contracts\ServiceUriResolverInterface;
 use Paganini\ServiceDiscovery\ServiceUrlSpecifier;
 
 /**
- * Resolves `mall_agg.foundation.base_url` (from API_GATEWAY_BASE_URL): Fusio-compatible `://{{service_key}}`
+ * Resolves `api_gw.base_url` (from API_GATEWAY_BASE_URL): service-discovery-replaceable `://{{service_key}}`
  * via Redis when present; otherwise returns trimmed URL unchanged.
  *
  * Memoizes resolved URLs to avoid Redis on every request (TTL from config).
  * {@see ServiceUriResolverInterface} is resolved only when the template contains `://{{` (lazy), so plain URLs never open Redis.
  */
-final class ResolvedFoundationBaseUrl
+final readonly class ResolvedApiGatewayBaseUrl
 {
     public function __construct(
-        private readonly Application $app,
-        private readonly Memoizer $memoizer,
-        private readonly int $memoTtlSeconds,
-    ) {}
+        private Application $app,
+        private Memoizer    $memoizer,
+        private int         $memoTtlSeconds)
+    {
+    }
 
     /**
      * Trimmed gateway base URL, or empty string if unset.
+     * @throws JsonException|BindingResolutionException
      */
     public function resolve(): string
     {
-        $raw = (string) config('mall_agg.foundation.base_url', '');
-        if ($raw === '') {
+        $raw = (string)config('api_gw.base_url');
+        if (!$raw) {
             return '';
         }
-        if (! str_contains($raw, '://{{')) {
+        if (!str_contains($raw, '://{{')) {
             return rtrim($raw, '/');
         }
 
-        $cacheKey = 'mall_agg:foundation_base:'.CacheKeyGenerator::fromAssociativeArray(['u' => $raw]);
+        $cacheKey = 'mall_agg:api_gw:' . CacheKeyGenerator::fromAssociativeArray(['u' => $raw]);
 
         return rtrim(
             $this->memoizer->getOrCompute(
                 $cacheKey,
                 $this->memoTtlSeconds,
-                fn (): string => ServiceUrlSpecifier::specifyHost(
+                fn(): string => ServiceUrlSpecifier::specifyHost(
                     $raw,
-                    $this->app->make(ServiceUriResolverInterface::class),
-                    null
+                    $this->app->make(ServiceUriResolverInterface::class)
                 )
             ),
             '/'
@@ -63,8 +66,8 @@ final class ResolvedFoundationBaseUrl
         if ($base === '') {
             return '';
         }
-        $path = '/'.ltrim($path, '/');
+        $path = '/' . ltrim($path, '/');
 
-        return $base.$path;
+        return $base . $path;
     }
 }

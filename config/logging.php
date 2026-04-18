@@ -71,14 +71,14 @@ return [
 
         'single' => array_merge([
             'driver' => 'single',
-            'path' => storage_path('logs/laravel.log'),
+            'path' => '/var/log/project/mall-agg/app.log',
             'level' => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
         ], $defaultFileLogFormatter),
 
         'daily' => array_merge([
             'driver' => 'daily',
-            'path' => storage_path('logs/laravel.log'),
+            'path' => '/var/log/project/mall-agg/app.log',
             'level' => env('LOG_LEVEL', 'debug'),
             'days' => env('LOG_DAILY_DAYS', 7),
             'replace_placeholders' => true,

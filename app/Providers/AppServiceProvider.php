@@ -5,13 +5,13 @@ namespace App\Providers;
 use App\Infrastructure\ServiceDiscovery\LaravelRedisStringClient;
 use App\Queue\Connectors\DatabaseMillisConnector;
 use App\Queue\Failed\DatabaseUuidFailedJobProviderMillis;
-use App\Services\Mall\MallCatalogService;
-use App\Services\Mall\OrderCommandService;
-use App\Services\Mall\ProductInventoryService;
-use App\Services\Mall\ProductPriceService;
-use App\Services\Mall\ServFd\CmsProductClient;
-use App\Services\Mall\ServFd\SearchRecClient;
-use App\Services\User\ResolvedFoundationBaseUrl;
+use App\Services\api_gw\ResolvedApiGatewayBaseUrl;
+use App\Services\mall\MallCatalogService;
+use App\Services\mall\OrderCommandService;
+use App\Services\mall\ProductInventoryService;
+use App\Services\mall\ProductPriceService;
+use App\Services\mall\serv_fd\CmsProductClient;
+use App\Services\mall\serv_fd\SearchRecClient;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\ServiceProvider;
@@ -42,14 +42,14 @@ class AppServiceProvider extends ServiceProvider
             );
         });
 
-        $this->app->singleton(ResolvedFoundationBaseUrl::class, function (Application $app) {
+        $this->app->singleton(ResolvedApiGatewayBaseUrl::class, function (Application $app) {
             $ttl = (int) config('mall_agg.foundation.service_discovery.memo_ttl_seconds', 60);
             if ($ttl < 0) {
                 $ttl = 0;
             }
             $store = \function_exists('apcu_fetch') ? new ApcuMemoStore('mall_agg.foundation_base') : new ArrayMemoStore;
 
-            return new ResolvedFoundationBaseUrl(
+            return new ResolvedApiGatewayBaseUrl(
                 $app,
                 new Memoizer($store),
                 $ttl

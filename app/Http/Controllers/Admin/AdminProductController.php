@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Services\Mall\ProductInventoryService;
-use App\Services\Mall\ProductPriceService;
-use App\Services\Mall\ServFd\CmsProductClient;
-use App\Services\Mall\ServFd\SearchRecClient;
+use App\Services\mall\ProductInventoryService;
+use App\Services\mall\ProductPriceService;
+use App\Services\mall\serv_fd\CmsProductClient;
+use App\Services\mall\serv_fd\SearchRecClient;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;

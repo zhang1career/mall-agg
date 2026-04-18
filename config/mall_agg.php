@@ -1,7 +1,7 @@
 <?php
 
-use App\Services\Mall\Aggregation\LocalProductInventoryProvider;
-use App\Services\Mall\Aggregation\LocalProductPriceProvider;
+use App\Services\mall\aggregation\LocalProductInventoryProvider;
+use App\Services\mall\aggregation\LocalProductPriceProvider;
 
 return [
     /*
@@ -12,19 +12,6 @@ return [
         'log_http_errors' => (bool) env('MALL_AGG_API_LOG_HTTP_ERRORS', env('MALL_AGG_API_LOG_HTTP_ERRORS', true)),
         'normalize_5xx_json_body' => (bool) env('MALL_AGG_API_NORMALIZE_5XX_JSON', env('MALL_AGG_API_NORMALIZE_5XX_JSON', false)),
         'normalize_5xx_message' => env('MALL_AGG_API_NORMALIZE_5XX_MESSAGE', env('MALL_AGG_API_NORMALIZE_5XX_MESSAGE', '服务器内部错误')),
-    ],
-
-    'serv_fd' => [
-        'timeout_seconds' => (int) env('API_GATEWAY_TIMEOUT_SECONDS', 3),
-
-        'searchrec' => [
-            'access_key' => (string) env('MALL_SEARCHREC_ACCESS_KEY', ''),
-            'timeout_seconds' => 5,
-        ],
-    ],
-
-    'cms' => [
-        'content_route' => env('MALL_CMS_CONTENT_ROUTE', ''),
     ],
 
     'foundation' => [

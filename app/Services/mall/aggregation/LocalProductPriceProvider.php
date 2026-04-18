@@ -2,20 +2,20 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Mall\Aggregation;
+namespace App\Services\mall\aggregation;
 
 use App\Contracts\UserBusinessServiceContract;
-use App\Services\Mall\ProductPriceService;
+use App\Services\mall\ProductPriceService;
 
 /**
  * Read-side ProviderContract: resolves prices via local DB (function-call underlying layer).
  * Enable in config/mall_agg.php business_services when you need this slice in a shared aggregation executor.
  */
-final class LocalProductPriceProvider implements UserBusinessServiceContract
+final readonly class LocalProductPriceProvider implements UserBusinessServiceContract
 {
-    public function __construct(
-        private readonly ProductPriceService $prices,
-    ) {}
+    public function __construct(private ProductPriceService $prices)
+    {
+    }
 
     public function key(): string
     {
@@ -28,17 +28,17 @@ final class LocalProductPriceProvider implements UserBusinessServiceContract
     }
 
     /**
-     * @param  array<string, mixed>  $subject
-     * @param  array<string, mixed>  $context
+     * @param array<string, mixed> $subject
+     * @param array<string, mixed> $context
      * @return array<string, mixed>
      */
     public function fetch(array $subject, array $context): array
     {
         $ids = $context['mall_product_ids'];
-        if (! is_array($ids)) {
+        if (!is_array($ids)) {
             return ['prices' => []];
         }
-        $intIds = array_map(static fn (mixed $v): int => (int) $v, $ids);
+        $intIds = array_map(static fn(mixed $v): int => (int)$v, $ids);
 
         return [
             'prices' => $this->prices->getPriceByProductIds($intIds),

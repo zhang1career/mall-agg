@@ -7,7 +7,7 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\MallOrderStatus;
 use App\Http\Controllers\Controller;
 use App\Models\MallOrder;
-use App\Services\Mall\OrderCommandService;
+use App\Services\mall\OrderCommandService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
