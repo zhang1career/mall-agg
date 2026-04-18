@@ -14,6 +14,8 @@ use App\Services\mall\serv_fd\CmsProductClient;
 use App\Services\mall\serv_fd\SearchRecClient;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 use Paganini\Capability\ProviderRegistry;
 use Paganini\Memo\ApcuMemoStore;
@@ -21,6 +23,8 @@ use Paganini\Memo\ArrayMemoStore;
 use Paganini\Memo\Memoizer;
 use Paganini\ServiceDiscovery\Contracts\ServiceUriResolverInterface;
 use Paganini\ServiceDiscovery\RedisServiceUriResolver;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -88,6 +92,25 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if (config('mall_agg.http_client.log_outbound')) {
+            Http::globalRequestMiddleware(function (RequestInterface $request) {
+                Log::debug('HTTP outbound request', [
+                    'method' => $request->getMethod(),
+                    'uri' => (string) $request->getUri(),
+                ]);
+
+                return $request;
+            });
+
+            Http::globalResponseMiddleware(function (ResponseInterface $response) {
+                Log::debug('HTTP outbound response', [
+                    'status' => $response->getStatusCode(),
+                ]);
+
+                return $response;
+            });
+        }
+
         Paginator::useBootstrapFive();
 
         // Use custom database queue with ct and millisecond timestamps

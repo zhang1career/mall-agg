@@ -163,12 +163,12 @@ final readonly class CmsProductClient
 
     private function listUrl(): string
     {
-        return $this->baseUrl . $this->contentRoute . '/';
+        return $this->baseUrl . $this->contentRoute;
     }
 
     private function itemUrl(int $id): string
     {
-        return $this->baseUrl . $this->contentRoute . '/' . $id . '/';
+        return $this->baseUrl . $this->contentRoute . '/' . $id;
     }
 
     /**

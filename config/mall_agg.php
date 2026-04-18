@@ -14,6 +14,13 @@ return [
         'normalize_5xx_message' => env('MALL_AGG_API_NORMALIZE_5XX_MESSAGE', env('MALL_AGG_API_NORMALIZE_5XX_MESSAGE', '服务器内部错误')),
     ],
 
+    /*
+    | http_client.log_outbound: 为 true 时在 Http 工厂上注册全局中间件，对外请求/响应打 Log::debug（仍受 LOG_LEVEL 约束）。
+    */
+    'http_client' => [
+        'log_outbound' => (bool) env('LOG_HTTP_OUTBOUND', true),
+    ],
+
     'foundation' => [
         'base_url' => env('API_GATEWAY_BASE_URL', ''),
         /*
