@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Mall\ServFd;
+namespace App\Services\mall\serv_fd;
 
+use App\Services\api_gw\ResolvedApiGatewayBaseUrl;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Paganini\Aggregation\Exceptions\DownstreamServiceException;
@@ -13,28 +15,38 @@ use RuntimeException;
 /**
  * CMS content API client: {@link https://github.com/...} api_cms.json with content_route = product.
  */
-final class CmsProductClient
+final readonly class CmsProductClient
 {
     public function __construct(
-        private readonly string $baseUrl,
-        private readonly string $contentRoute,
-        private readonly int $timeoutSeconds,
-    ) {}
+        private string $baseUrl,
+        private string $contentRoute,
+        private int    $timeoutSeconds)
+    {
+    }
 
+    /**
+     */
     public static function fromConfig(): self
     {
-        $base = rtrim((string) config('mall_agg.serv_fd.base_url', ''), '/');
-        $route = (string) config('mall_agg.cms.content_route', 'product');
-        $timeout = (int) config('mall_agg.serv_fd.timeout_seconds', 3);
-        if ($base === '') {
-            throw new RuntimeException('Missing mall_agg.serv_fd.base_url (SERV_FD_BASE_URL).');
+        /** @var ResolvedApiGatewayBaseUrl $foundationBase */
+        $foundationBase = app(ResolvedApiGatewayBaseUrl::class);
+        $base = $foundationBase->resolve();
+        $cmsUrl = (string)config('api_gw.cms.cms_url');
+        $route = (string)config('api_gw.cms.content_route');
+        $timeout = (int)config('api_gw.timeout_seconds');
+        if (!$base) {
+            throw new RuntimeException('Missing API gateway base URL (API_GATEWAY_BASE_URL).');
+        }
+        if (!$cmsUrl) {
+            throw new RuntimeException('Missing API gateway CMS URL (API_GATEWAY_CMS_URL).');
         }
 
-        return new self($base, $route, $timeout);
+        return new self($base . $cmsUrl, $route, $timeout);
     }
 
     /**
      * @return array{items: list<array<string, mixed>>, pagination: array<string, mixed>}
+     * @throws ConnectionException
      */
     public function paginate(int $page = 1, int $perPage = 15): array
     {
@@ -46,17 +58,17 @@ final class CmsProductClient
             ]);
 
         if ($response->status() === 404) {
-            throw new DownstreamServiceException('CMS content route not found: '.$this->contentRoute);
+            throw new DownstreamServiceException('CMS content route not found: ' . $this->contentRoute);
         }
 
-        if (! $response->successful()) {
+        if (!$response->successful()) {
             throw new DownstreamServiceException(
                 sprintf('CMS list failed with HTTP %d.', $response->status())
             );
         }
 
         $data = DownstreamPayload::extractData($response->json(), 'cms product list');
-        if (! isset($data['items'], $data['pagination']) || ! is_array($data['items']) || ! is_array($data['pagination'])) {
+        if (!isset($data['items'], $data['pagination']) || !is_array($data['items']) || !is_array($data['pagination'])) {
             throw new DownstreamServiceException('Invalid CMS list payload: missing items or pagination.');
         }
 
@@ -68,6 +80,7 @@ final class CmsProductClient
 
     /**
      * @return array<string, mixed>
+     * @throws ConnectionException
      */
     public function find(int $id): array
     {
@@ -76,10 +89,10 @@ final class CmsProductClient
             ->get($this->itemUrl($id));
 
         if ($response->status() === 404) {
-            throw new DownstreamServiceException('CMS product not found: '.$id);
+            throw new DownstreamServiceException('CMS product not found: ' . $id);
         }
 
-        if (! $response->successful()) {
+        if (!$response->successful()) {
             throw new DownstreamServiceException(
                 sprintf('CMS detail failed with HTTP %d.', $response->status())
             );
@@ -89,8 +102,9 @@ final class CmsProductClient
     }
 
     /**
-     * @param  array{title: string, description?: string, thumbnail?: string, main_media?: string, ext_media?: string}  $fields
+     * @param array{title: string, description?: string, thumbnail?: string, main_media?: string, ext_media?: string} $fields
      * @return array<string, mixed>
+     * @throws ConnectionException
      */
     public function create(array $fields): array
     {
@@ -103,8 +117,9 @@ final class CmsProductClient
     }
 
     /**
-     * @param  array<string, mixed>  $fields
+     * @param array<string, mixed> $fields
      * @return array<string, mixed>
+     * @throws ConnectionException
      */
     public function update(int $id, array $fields): array
     {
@@ -116,6 +131,9 @@ final class CmsProductClient
         return $this->unwrapWriteResponse($response, 'cms product update', [200]);
     }
 
+    /**
+     * @throws ConnectionException
+     */
     public function delete(int $id): void
     {
         $response = Http::timeout($this->timeoutSeconds)
@@ -123,38 +141,38 @@ final class CmsProductClient
             ->delete($this->itemUrl($id));
 
         if ($response->status() === 404) {
-            throw new DownstreamServiceException('CMS product not found: '.$id);
+            throw new DownstreamServiceException('CMS product not found: ' . $id);
         }
 
-        if (! $response->successful()) {
+        if (!$response->successful()) {
             throw new DownstreamServiceException(
                 sprintf('CMS delete failed with HTTP %d.', $response->status())
             );
         }
 
         $json = $response->json();
-        if (! is_array($json)) {
+        if (!is_array($json)) {
             throw new DownstreamServiceException('Invalid CMS delete payload.');
         }
-        if ((int) ($json['errorCode'] ?? -1) !== 0) {
-            $message = (string) ($json['message'] ?? 'downstream error');
+        if ((int)($json['errorCode'] ?? -1) !== 0) {
+            $message = (string)($json['message'] ?? 'downstream error');
 
-            throw new DownstreamServiceException('CMS delete error: '.$message);
+            throw new DownstreamServiceException('CMS delete error: ' . $message);
         }
     }
 
     private function listUrl(): string
     {
-        return $this->baseUrl.'/api/cms/'.$this->contentRoute.'/';
+        return $this->baseUrl . $this->contentRoute;
     }
 
     private function itemUrl(int $id): string
     {
-        return $this->baseUrl.'/api/cms/'.$this->contentRoute.'/'.$id.'/';
+        return $this->baseUrl . $this->contentRoute . '/' . $id;
     }
 
     /**
-     * @param  array<string, mixed>  $fields
+     * @param array<string, mixed> $fields
      * @return array<string, string>
      */
     private function filterProductFields(array $fields): array
@@ -162,15 +180,15 @@ final class CmsProductClient
         $allowed = ['title', 'description', 'thumbnail', 'main_media', 'ext_media'];
         $out = [];
         foreach ($allowed as $key) {
-            if (! array_key_exists($key, $fields)) {
+            if (!array_key_exists($key, $fields)) {
                 continue;
             }
             $value = $fields[$key];
             if ($value === null) {
                 continue;
             }
-            if (! is_string($value)) {
-                throw new RuntimeException('Field '.$key.' must be a string.');
+            if (!is_string($value)) {
+                throw new RuntimeException('Field ' . $key . ' must be a string.');
             }
             $out[$key] = $value;
         }
@@ -179,31 +197,31 @@ final class CmsProductClient
     }
 
     /**
-     * @param  list<int>  $successStatuses
+     * @param list<int> $successStatuses
      * @return array<string, mixed>
      */
     private function unwrapWriteResponse(Response $response, string $label, array $successStatuses): array
     {
         $status = $response->status();
-        if (! in_array($status, $successStatuses, true)) {
+        if (!in_array($status, $successStatuses, true)) {
             throw new DownstreamServiceException(
                 sprintf('%s failed with HTTP %d.', $label, $status)
             );
         }
 
         $json = $response->json();
-        if (! is_array($json)) {
-            throw new DownstreamServiceException('Invalid JSON from '.$label);
+        if (!is_array($json)) {
+            throw new DownstreamServiceException('Invalid JSON from ' . $label);
         }
 
-        if ((int) ($json['errorCode'] ?? -1) === 100) {
-            $message = (string) ($json['message'] ?? 'validation failed');
+        if ((int)($json['errorCode'] ?? -1) === 100) {
+            $message = (string)($json['message'] ?? 'validation failed');
             $data = $json['data'] ?? null;
             if (is_array($data)) {
                 $first = '';
                 foreach ($data as $k => $v) {
                     if (is_string($v)) {
-                        $first = (string) $k.': '.$v;
+                        $first = $k . ': ' . $v;
                         break;
                     }
                 }
@@ -212,7 +230,7 @@ final class CmsProductClient
                 }
             }
 
-            throw new DownstreamServiceException($label.' validation: '.$message);
+            throw new DownstreamServiceException($label . ' validation: ' . $message);
         }
 
         return DownstreamPayload::extractData($json, $label);

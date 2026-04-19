@@ -2,44 +2,50 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Mall;
+namespace App\Services\mall;
 
+use App\Services\api_gw\ResolvedApiGatewayBaseUrl;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Throwable;
 
 /**
  * Uploads files to the foundation OSS API (HTTP PUT), same mechanism as Django
  * app_user.services.avatar_storage_service (HTTP PUT to /api/oss/{bucket}/{key}).
  */
-final class MallOssUploadService
+final readonly class MallOssUploadService
 {
+    public function __construct(private ResolvedApiGatewayBaseUrl $resolvedFoundationBaseUrl)
+    {
+    }
+
     /**
      * @return non-empty-string Object key stored in CMS (e.g. mall/products/{uuid}.jpg)
      */
     public function uploadProductFile(UploadedFile $uploadedFile): string
     {
-        $prefix = trim((string) config('mall_upload.prefix'), '/');
+        $prefix = trim((string)config('mall_upload.prefix'), '/');
         if ($prefix === '') {
             $prefix = 'mall/products';
         }
 
         $extension = $uploadedFile->getClientOriginalExtension() ?: $uploadedFile->extension() ?: 'bin';
-        $pathId = (string) Str::uuid();
-        $objectKey = $prefix.'/'.$pathId.'.'.$extension;
+        $pathId = (string)Str::uuid();
+        $objectKey = $prefix . '/' . $pathId . '.' . $extension;
 
-        $base = trim((string) config('mall_upload.oss_base_url'), '/');
-        $bucket = trim((string) config('mall_upload.oss_bucket'), '/');
+        $base = $this->resolvedFoundationBaseUrl->resolvePathSuffix('/api/oss');
+        $bucket = trim((string)config('mall_upload.oss_bucket'), '/');
 
         if ($base === '' || $bucket === '') {
             throw new RuntimeException(
-                'OSS upload is not configured: set SERV_FD_BASE_URL (or MALL_OSS_UPLOAD_BASE_URL) and MALL_OSS_BUCKET.'
+                'OSS upload is not configured: set API_GATEWAY_BASE_URL and MALL_OSS_BUCKET.'
             );
         }
 
         $encodedKey = $this->encodeObjectKeyForUrl($objectKey);
-        $uploadUrl = $base.'/'.$bucket.'/'.$encodedKey;
+        $uploadUrl = $base . '/' . $bucket . '/' . $encodedKey;
 
         $mime = $uploadedFile->getMimeType() ?: 'application/octet-stream';
         $path = $uploadedFile->getRealPath();
@@ -59,8 +65,8 @@ final class MallOssUploadService
                 ])
                 ->withBody($stream, $mime)
                 ->put($uploadUrl);
-        } catch (\Throwable $e) {
-            throw new RuntimeException('OSS upload request failed: '.$e->getMessage(), 0, $e);
+        } catch (Throwable $e) {
+            throw new RuntimeException('OSS upload request failed: ' . $e->getMessage(), 0, $e);
         } finally {
             if (is_resource($stream)) {
                 fclose($stream);
@@ -85,6 +91,6 @@ final class MallOssUploadService
     {
         $segments = explode('/', $objectKey);
 
-        return implode('/', array_map(static fn (string $s): string => rawurlencode($s), $segments));
+        return implode('/', array_map(static fn(string $s): string => rawurlencode($s), $segments));
     }
 }

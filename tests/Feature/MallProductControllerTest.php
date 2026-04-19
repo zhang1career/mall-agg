@@ -14,7 +14,7 @@ class MallProductControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config()->set('mall_agg.serv_fd.base_url', 'http://serv-fd.test');
+        config()->set('mall_agg.foundation.base_url', 'http://serv-fd.test');
     }
 
     public function test_product_list_returns_prices_from_local_table(): void

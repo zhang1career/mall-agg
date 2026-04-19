@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "mall-agg 用户端 API",
-    "description": "聚合服务对外 HTTP JSON 接口（`routes/api.php`）。业务响应统一为 `ApiResponse` 信封：`data`、`errorCode`、`message`、`_req_id`。成功时 `errorCode` 为 `0`；失败时 `data` 常为空字符串。\n\n管理后台创建/更新商品时，服务端会**同步**调用下游 SearchRec `POST {base}/api/searchrec/index/upsert`（`base` 取自 `MALL_SEARCHREC_BASE_URL`，未设时与 `SERV_FD_BASE_URL` 相同；需 `MALL_SEARCHREC_ACCESS_KEY`）。该调用为服务端出站，**不**作为本 OpenAPI 路径对外暴露；请求/响应体见 `service_foundation` 的 `docs/api_searchrec.json`。",
+    "description": "聚合服务对外 HTTP JSON 接口（`routes/api.php`）。业务响应统一为 `ApiResponse` 信封：`data`、`errorCode`、`message`、`_req_id`。成功时 `errorCode` 为 `0`；失败时 `data` 常为空字符串。\n\n管理后台创建/更新商品时，服务端会**同步**调用下游 SearchRec `POST {API_GATEWAY_BASE_URL}/api/searchrec/index/upsert`（需 `MALL_SEARCHREC_ACCESS_KEY`）。该调用为服务端出站，**不**作为本 OpenAPI 路径对外暴露；请求/响应体见 `service_foundation` 的 `docs/api_searchrec.json`。",
     "version": "1.0.0"
   },
   "servers": [

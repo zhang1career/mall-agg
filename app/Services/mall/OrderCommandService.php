@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Mall;
+namespace App\Services\mall;
 
 use App\Enums\MallOrderStatus;
 use App\Models\MallOrder;
@@ -12,15 +12,16 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
-final class OrderCommandService
+final readonly class OrderCommandService
 {
     public function __construct(
-        private readonly ProductPriceService $prices,
-        private readonly ProductInventoryService $inventory,
-    ) {}
+        private ProductPriceService     $prices,
+        private ProductInventoryService $inventory)
+    {
+    }
 
     /**
-     * @param  list<array{product_id: int, quantity: int}>  $lines
+     * @param list<array{product_id: int, quantity: int}> $lines
      */
     public function createOrder(int $userId, array $lines): MallOrder
     {
@@ -32,8 +33,8 @@ final class OrderCommandService
             /** @var array<int, int> $merged */
             $merged = [];
             foreach ($lines as $line) {
-                $productId = (int) $line['product_id'];
-                $quantity = (int) $line['quantity'];
+                $productId = (int)$line['product_id'];
+                $quantity = (int)$line['quantity'];
                 if ($productId < 1 || $quantity < 1) {
                     throw new RuntimeException('Invalid order line.');
                 }
@@ -45,8 +46,8 @@ final class OrderCommandService
 
             foreach ($merged as $productId => $quantity) {
                 $priceRow = $this->prices->getPriceByProductIds([$productId]);
-                if (! array_key_exists($productId, $priceRow)) {
-                    throw new RuntimeException('Missing price for product '.$productId);
+                if (!array_key_exists($productId, $priceRow)) {
+                    throw new RuntimeException('Missing price for product ' . $productId);
                 }
                 $unit = $priceRow[$productId];
 
@@ -85,7 +86,7 @@ final class OrderCommandService
     public function transitionStatus(MallOrder $order, MallOrderStatus $next): MallOrder
     {
         $current = $order->status;
-        if (! $current->canTransitionTo($next)) {
+        if (!$current->canTransitionTo($next)) {
             throw new RuntimeException(
                 sprintf('Cannot transition order %d from %s to %s.', $order->id, $current->value, $next->value)
             );
@@ -95,7 +96,7 @@ final class OrderCommandService
             $order->load('items');
             if ($current === MallOrderStatus::Pending && $next === MallOrderStatus::Cancelled) {
                 foreach ($order->items as $item) {
-                    $this->inventory->lockAndIncrement((int) $item->pid, (int) $item->quantity);
+                    $this->inventory->lockAndIncrement($item->pid, $item->quantity);
                 }
             }
 
@@ -109,7 +110,7 @@ final class OrderCommandService
     /**
      * @return LengthAwarePaginator<int, MallOrder>
      */
-    public function paginateForUser(int $userId, int $perPage = 15)
+    public function paginateForUser(int $userId, int $perPage = 15): LengthAwarePaginator
     {
         return MallOrder::query()
             ->where('uid', $userId)

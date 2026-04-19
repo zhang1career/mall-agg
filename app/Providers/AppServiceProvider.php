@@ -2,17 +2,29 @@
 
 namespace App\Providers;
 
+use App\Infrastructure\ServiceDiscovery\LaravelRedisStringClient;
 use App\Queue\Connectors\DatabaseMillisConnector;
 use App\Queue\Failed\DatabaseUuidFailedJobProviderMillis;
-use App\Services\Mall\MallCatalogService;
-use App\Services\Mall\OrderCommandService;
-use App\Services\Mall\ProductInventoryService;
-use App\Services\Mall\ProductPriceService;
-use App\Services\Mall\ServFd\CmsProductClient;
-use App\Services\Mall\ServFd\SearchRecClient;
+use App\Services\api_gw\ResolvedApiGatewayBaseUrl;
+use App\Services\mall\MallCatalogService;
+use App\Services\mall\OrderCommandService;
+use App\Services\mall\ProductInventoryService;
+use App\Services\mall\ProductPriceService;
+use App\Services\mall\serv_fd\CmsProductClient;
+use App\Services\mall\serv_fd\SearchRecClient;
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 use Paganini\Capability\ProviderRegistry;
+use Paganini\Memo\ApcuMemoStore;
+use Paganini\Memo\ArrayMemoStore;
+use Paganini\Memo\Memoizer;
+use Paganini\ServiceDiscovery\Contracts\ServiceUriResolverInterface;
+use Paganini\ServiceDiscovery\RedisServiceUriResolver;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -21,6 +33,33 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->singleton(LaravelRedisStringClient::class, function (Application $app) {
+            $conn = (string) config('mall_agg.foundation.service_discovery.redis_connection', 'default');
+
+            return new LaravelRedisStringClient($app['redis']->connection($conn));
+        });
+
+        $this->app->singleton(ServiceUriResolverInterface::class, function (Application $app) {
+            return new RedisServiceUriResolver(
+                $app->make(LaravelRedisStringClient::class),
+                (string) config('mall_agg.foundation.service_discovery.redis_key_prefix', '')
+            );
+        });
+
+        $this->app->singleton(ResolvedApiGatewayBaseUrl::class, function (Application $app) {
+            $ttl = (int) config('mall_agg.foundation.service_discovery.memo_ttl_seconds', 60);
+            if ($ttl < 0) {
+                $ttl = 0;
+            }
+            $store = \function_exists('apcu_fetch') ? new ApcuMemoStore('mall_agg.foundation_base') : new ArrayMemoStore;
+
+            return new ResolvedApiGatewayBaseUrl(
+                $app,
+                new Memoizer($store),
+                $ttl
+            );
+        });
+
         $this->app->singleton(CmsProductClient::class, fn () => CmsProductClient::fromConfig());
         $this->app->singleton(SearchRecClient::class, fn () => SearchRecClient::fromConfig());
         $this->app->singleton(ProductPriceService::class);
@@ -53,6 +92,25 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if (config('mall_agg.http_client.log_outbound')) {
+            Http::globalRequestMiddleware(function (RequestInterface $request) {
+                Log::debug('HTTP outbound request', [
+                    'method' => $request->getMethod(),
+                    'uri' => (string) $request->getUri(),
+                ]);
+
+                return $request;
+            });
+
+            Http::globalResponseMiddleware(function (ResponseInterface $response) {
+                Log::debug('HTTP outbound response', [
+                    'status' => $response->getStatusCode(),
+                ]);
+
+                return $response;
+            });
+        }
+
         Paginator::useBootstrapFive();
 
         // Use custom database queue with ct and millisecond timestamps

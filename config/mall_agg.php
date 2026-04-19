@@ -1,12 +1,7 @@
 <?php
 
-use App\Services\Mall\Aggregation\LocalProductInventoryProvider;
-use App\Services\Mall\Aggregation\LocalProductPriceProvider;
-
-/**
- * Single source for serv-fd base URL: SERV_FD_BASE_URL (falls back).
- */
-$servFdBaseUrl = env('SERV_FD_BASE_URL');
+use App\Services\mall\aggregation\LocalProductInventoryProvider;
+use App\Services\mall\aggregation\LocalProductPriceProvider;
 
 return [
     /*
@@ -19,26 +14,27 @@ return [
         'normalize_5xx_message' => env('MALL_AGG_API_NORMALIZE_5XX_MESSAGE', env('MALL_AGG_API_NORMALIZE_5XX_MESSAGE', '服务器内部错误')),
     ],
 
-    'serv_fd' => [
-        'base_url' => $servFdBaseUrl,
-        'timeout_seconds' => (int) env('SERV_FD_TIMEOUT_SECONDS', 3),
-
-        'searchrec' => [
-            'base_url' => $servFdBaseUrl . '/api/searchrec',
-            'access_key' => (string) env('MALL_SEARCHREC_ACCESS_KEY', ''),
-            'timeout_seconds' => (int) env('MALL_SEARCHREC_TIMEOUT_SECONDS', 5),
-        ],
-    ],
-
-    'cms' => [
-        'content_route' => env('MALL_CMS_CONTENT_ROUTE', 'product'),
+    /*
+    | http_client.log_outbound: 为 true 时在 Http 工厂上注册全局中间件，对外请求/响应打 Log::debug（仍受 LOG_LEVEL 约束）。
+    */
+    'http_client' => [
+        'log_outbound' => (bool) env('LOG_HTTP_OUTBOUND', true),
     ],
 
     'foundation' => [
-        'base_url' => $servFdBaseUrl,
-        'me_endpoint' => env('USER_CENTER_ME_ENDPOINT', '/api/user/me'),
-        'timeout_seconds' => (int) env('USER_CENTER_TIMEOUT_SECONDS', 3),
-        'unauthorized_code' => (int) env('USER_CENTER_UNAUTHORIZED_CODE', 40101),
+        'base_url' => env('API_GATEWAY_BASE_URL', ''),
+        /*
+         * When `base_url` contains `://{{service_key}}` (Fusio-style), resolve via Redis (paganini).
+         * Plain URLs skip Redis entirely.
+         */
+        'service_discovery' => [
+            'memo_ttl_seconds' => (int) env('API_GATEWAY_SD_MEMO_TTL', 60),
+            'redis_connection' => env('API_GATEWAY_SD_DB_CONN', 'default'),
+            'redis_key_prefix' => env('API_GATEWAY_SD_KEY_PREFIX', ''),
+        ],
+        'me_endpoint' => '/api/user/me',
+        'timeout_seconds' => 3,
+        'unauthorized_code' => 40101,
     ],
 
     /*

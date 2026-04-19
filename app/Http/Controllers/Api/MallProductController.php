@@ -6,8 +6,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Components\ApiResponse;
 use App\Http\Controllers\Controller;
-use App\Services\Mall\MallCatalogService;
-use App\Services\Mall\ServFd\SearchRecClient;
+use App\Services\mall\MallCatalogService;
+use App\Services\mall\serv_fd\SearchRecClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Paganini\Aggregation\Exceptions\DownstreamServiceException;

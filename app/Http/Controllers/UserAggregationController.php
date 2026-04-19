@@ -4,9 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Components\ApiResponse;
 use App\Exceptions\FoundationAuthRequiredException;
-use App\Services\User\UserAggregationExecutor;
-use App\Services\User\UserDegradePolicy;
-use App\Services\User\UserFoundationGateway;
+use App\Services\user\UserAggregationExecutor;
+use App\Services\user\UserDegradePolicy;
+use App\Services\user\UserFoundationGateway;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Paganini\Capability\ProviderRegistry;

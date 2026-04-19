@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Mall;
+namespace App\Services\mall;
 
 use App\Models\ProductPrice;
 
 final class ProductPriceService
 {
     /**
-     * @param  list<int>  $productIds
+     * @param list<int> $productIds
      * @return array<int, int> pid => price (minor units)
      */
     public function getPriceByProductIds(array $productIds): array
@@ -24,7 +24,7 @@ final class ProductPriceService
 
         $map = [];
         foreach ($rows as $row) {
-            $map[(int) $row->pid] = (int) $row->price;
+            $map[(int)$row->pid] = (int)$row->price;
         }
 
         return $map;

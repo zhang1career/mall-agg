@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Mall;
+namespace App\Services\mall;
 
 use App\Models\ProductInventory;
 use Illuminate\Database\Eloquent\ModelNotFoundException;

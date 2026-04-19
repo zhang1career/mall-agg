@@ -1,8 +1,9 @@
 <?php
 
-namespace App\Services\User;
+namespace App\Services\user;
 
 use App\Exceptions\FoundationAuthRequiredException;
+use App\Services\api_gw\ResolvedApiGatewayBaseUrl;
 use Illuminate\Http\Client\Response as ClientResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -10,25 +11,29 @@ use Paganini\Aggregation\Exceptions\DownstreamServiceException;
 use Paganini\Aggregation\Support\DownstreamPayload;
 use RuntimeException;
 
-class UserFoundationGateway
+readonly class UserFoundationGateway
 {
+    public function __construct(private ResolvedApiGatewayBaseUrl $resolvedFoundationBaseUrl)
+    {
+    }
+
     public function fetchCurrentUser(Request $request): array
     {
-        $baseUrl = rtrim((string) config('mall_agg.foundation.base_url'), '/');
+        $baseUrl = $this->resolvedFoundationBaseUrl->resolve();
         if ($baseUrl === '') {
             throw new RuntimeException('Missing user foundation base_url configuration.');
         }
 
-        $timeout = (int) config('mall_agg.foundation.timeout_seconds', 3);
-        $endpoint = (string) config('mall_agg.foundation.me_endpoint', '/api/user/me');
-        $token = (string) $request->bearerToken();
+        $timeout = (int)config('mall_agg.foundation.timeout_seconds', 3);
+        $endpoint = (string)config('mall_agg.foundation.me_endpoint', '/api/user/me');
+        $token = (string)$request->bearerToken();
 
         $response = Http::timeout($timeout)
             ->withToken($token)
             ->acceptJson()
-            ->get($baseUrl.$endpoint);
+            ->get($baseUrl . $endpoint);
 
-        if (! $response->successful()) {
+        if (!$response->successful()) {
             if ($response->status() === 401) {
                 throw $this->authRequiredFromHttpResponse($response);
             }
@@ -54,7 +59,7 @@ class UserFoundationGateway
         }
 
         return new FoundationAuthRequiredException(
-            'Downstream error from foundation user service: '.$detail
+            'Downstream error from foundation user service: ' . $detail
         );
     }
 }

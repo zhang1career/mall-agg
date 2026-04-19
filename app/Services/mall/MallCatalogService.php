@@ -2,21 +2,24 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Mall;
+namespace App\Services\mall;
 
-use App\Services\Mall\ServFd\CmsProductClient;
+use App\Services\mall\serv_fd\CmsProductClient;
+use Illuminate\Http\Client\ConnectionException;
 use Paganini\Aggregation\Exceptions\DownstreamServiceException;
 
-final class MallCatalogService
+final readonly class MallCatalogService
 {
     public function __construct(
-        private readonly CmsProductClient $cms,
-        private readonly ProductPriceService $prices,
-        private readonly ProductInventoryService $inventory,
-    ) {}
+        private CmsProductClient        $cms,
+        private ProductPriceService     $prices,
+        private ProductInventoryService $inventory)
+    {
+    }
 
     /**
      * @return array{items: list<array<string, mixed>>, pagination: array<string, mixed>}
+     * @throws ConnectionException
      */
     public function listProductsWithPrices(int $page, int $perPage): array
     {
@@ -25,14 +28,14 @@ final class MallCatalogService
         $ids = [];
         foreach ($items as $row) {
             if (isset($row['id'])) {
-                $ids[] = (int) $row['id'];
+                $ids[] = (int)$row['id'];
             }
         }
         $priceMap = $this->prices->getPriceByProductIds($ids);
 
         $outItems = [];
         foreach ($items as $row) {
-            $id = isset($row['id']) ? (int) $row['id'] : 0;
+            $id = isset($row['id']) ? (int)$row['id'] : 0;
             $row['price'] = $priceMap[$id] ?? null;
             $row['currency'] = 'MINOR';
             $outItems[] = $row;
@@ -46,6 +49,7 @@ final class MallCatalogService
 
     /**
      * @return array<string, mixed>
+     * @throws ConnectionException
      */
     public function getProductWithPriceAndStock(int $id): array
     {
