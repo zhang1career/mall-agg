@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "mall-agg 用户端 API",
-    "description": "聚合服务对外 HTTP JSON 接口（`routes/api.php`）。业务响应统一为 `ApiResponse` 信封：`data`、`errorCode`、`message`、`_req_id`。成功时 `errorCode` 为 `0`；失败时 `data` 常为空字符串。\n\n**协调式结账**：`POST /api/mall/checkout` 在启用 `MALL_CHECKOUT_USE_COORDINATORS` 时走 Saga/TCC 编排（外部库存预留、积分冻结、支付预创建）；订单 JSON 含 `ext_inventory`、`checkout_phase`、`tid` 等字段。**内部 TCC 参与者**：`POST /internal/tcc/points/*` 由 app_tcc 协调器调用本机积分 Try/Confirm/Cancel，需请求头 `X-Internal-Token`（见 `mall_agg.internal.participant_token`），**不**面向终端用户。\n\n管理后台创建/更新商品时，服务端会**同步**调用下游 SearchRec `POST {API_GATEWAY_BASE_URL}/api/searchrec/index/upsert`（需 `MALL_SEARCHREC_ACCESS_KEY`）。该调用为服务端出站，**不**作为本 OpenAPI 路径对外暴露；请求/响应体见 `service_foundation` 的 `docs/api_searchrec.json`。",
-    "version": "1.1.0"
+    "description": "聚合服务对外 HTTP JSON 接口（`routes/api.php`）。业务响应统一为 `ApiResponse` 信封：`data`、`errorCode`、`message`、`_req_id`。成功时 `errorCode` 为 `0`；失败时 `data` 常为空字符串。\n\n**协调式结账**：`POST /api/mall/checkout` 在启用 `MALL_CHECKOUT_USE_COORDINATORS` 时走 Saga/TCC 编排（外部库存预留、积分冻结、支付预创建）；订单 JSON 含 `ext_inventory`、`checkout_phase`、`tid` 等字段。**内部 TCC 参与者**：`POST /internal/tcc/points/*` 由 app_tcc 协调器调用本机积分 Try/Confirm/Cancel，需请求头 `X-Internal-Token`（见 `mall_agg.internal.participant_token`），**不**面向终端用户。**积分余额**：`GET /api/mall/points` 查询当前用户可用积分（`balance_minor`）。\n\n管理后台创建/更新商品时，服务端会**同步**调用下游 SearchRec `POST {API_GATEWAY_BASE_URL}/api/searchrec/index/upsert`（需 `MALL_SEARCHREC_ACCESS_KEY`）。该调用为服务端出站，**不**作为本 OpenAPI 路径对外暴露；请求/响应体见 `service_foundation` 的 `docs/api_searchrec.json`。",
+    "version": "1.2.0"
   },
   "servers": [
     {
@@ -14,6 +14,7 @@
   "tags": [
     { "name": "MallProducts", "description": "商城商品目录（公开）" },
     { "name": "MallOrders", "description": "商城订单（需 Bearer）" },
+    { "name": "MallPoints", "description": "商城积分余额（需 Bearer；读 `points_balance` 可用余额）" },
     { "name": "MallCheckout", "description": "协调式结账（需 Bearer；需启用 `MALL_CHECKOUT_USE_COORDINATORS`）" },
     { "name": "InternalTccPoints", "description": "本机积分 TCC 参与者（供协调器调用；需 `X-Internal-Token`）" }
   ],
@@ -166,6 +167,44 @@
           },
           "404": {
             "description": "商品不存在或下游失败。`errorCode` 如 `40401`。",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiEnvelope" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mall/points": {
+      "get": {
+        "tags": ["MallPoints"],
+        "summary": "当前用户可用积分",
+        "description": "返回 Foundation 当前用户在本服务 `points_balance` 表中的可用余额（`balance_minor`，与下单/结账 `points_minor` 同单位）。无账户记录时 `balance_minor` 为 `0`（不自动开户）。",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/TraceId" }],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "errorCode": { "type": "integer", "example": 0 },
+                        "data": { "$ref": "#/components/schemas/PointsBalanceData" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未授权",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ApiEnvelope" }
@@ -694,6 +733,17 @@
                     "quantity": { "type": "integer" },
                     "unit_price": { "type": "integer",
                         "description": "单价（最小货币单位）"
+                    }
+                }
+            },
+            "PointsBalanceData": {
+                "type": "object",
+                "required": ["balance_minor"],
+                "properties": {
+                    "balance_minor": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "当前可用积分（最小单位，与结账 `points_minor` 一致）。"
                     }
                 }
             },

@@ -12,6 +12,19 @@ use RuntimeException;
 
 final class MallPointsTccService
 {
+    /**
+     * Available points for the user (minor units); no account row yields 0.
+     */
+    public function availableBalanceMinor(int $uid): int
+    {
+        $row = MallPointsBalance::query()->where('uid', $uid)->first();
+        if ($row === null) {
+            return 0;
+        }
+
+        return (int) $row->balance_minor;
+    }
+
     public function ensureAccount(int $uid): MallPointsBalance
     {
         $row = MallPointsBalance::query()->where('uid', $uid)->first();
