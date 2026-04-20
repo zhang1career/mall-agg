@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\ProductPrice;
+use App\Services\mall\serv_fd\CmsProductClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -14,13 +15,17 @@ class MallProductControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        config()->set('api_gw.base_url', 'http://serv-fd.test');
+        config()->set('api_gw.cms.cms_url', '/api/cms/');
+        config()->set('api_gw.cms.content_route', 'product');
         config()->set('mall_agg.foundation.base_url', 'http://serv-fd.test');
+        $this->app->forgetInstance(CmsProductClient::class);
     }
 
     public function test_product_list_returns_prices_from_local_table(): void
     {
         Http::fake([
-            'http://serv-fd.test/api/cms/product/*' => Http::response([
+            'http://serv-fd.test/api/cms/product*' => Http::response([
                 'errorCode' => 0,
                 'message' => '',
                 'data' => [

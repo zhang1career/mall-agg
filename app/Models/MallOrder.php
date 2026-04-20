@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\CheckoutPhase;
 use App\Enums\MallOrderStatus;
 use App\Models\Concerns\HasMillisTimestamps;
 use Illuminate\Database\Eloquent\Collection;
@@ -17,6 +18,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $total_price Order total in minor units (e.g. cents); denormalized at creation from line items
  * @property int $ct
  * @property int $ut
+ * @property int|null $saga_idem_key null = not assigned (unique when set)
+ * @property int|null $tcc_idem_key null = not assigned (unique when set)
+ * @property string $tid Coordinator global transaction id (TCC); empty string = unset
+ * @property CheckoutPhase $checkout_phase 0 = {@see CheckoutPhase::None}
+ * @property bool $ext_inventory
+ * @property string $ext_id External inventory id; empty string = unset
  * @property-read Collection<int, MallOrderItem> $items
  */
 class MallOrder extends Model
@@ -34,6 +41,12 @@ class MallOrder extends Model
         'total_price',
         'ct',
         'ut',
+        'saga_idem_key',
+        'tcc_idem_key',
+        'tid',
+        'checkout_phase',
+        'ext_inventory',
+        'ext_id',
     ];
 
     protected $casts = [
@@ -42,6 +55,12 @@ class MallOrder extends Model
         'total_price' => 'integer',
         'ct' => 'integer',
         'ut' => 'integer',
+        'saga_idem_key' => 'integer',
+        'tcc_idem_key' => 'integer',
+        'tid' => 'string',
+        'checkout_phase' => CheckoutPhase::class,
+        'ext_inventory' => 'boolean',
+        'ext_id' => 'string',
     ];
 
     /**

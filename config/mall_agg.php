@@ -56,4 +56,31 @@ return [
         'partial_failure_code' => (int) env('MALL_AGG_PARTIAL_FAILURE_CODE', env('MALL_AGG_PARTIAL_FAILURE_CODE', 20601)),
         'partial_failure_message' => env('MALL_AGG_PARTIAL_FAILURE_MESSAGE', env('MALL_AGG_PARTIAL_FAILURE_MESSAGE', 'Partially failed, degraded by aggregator.')),
     ],
+
+    'checkout' => [
+        'use_coordinators' => (bool) env('MALL_CHECKOUT_USE_COORDINATORS', false),
+        'use_tcc_coordinator' => (bool) env('MALL_CHECKOUT_USE_TCC_COORDINATOR', false),
+    ],
+
+    'internal' => [
+        'participant_token' => env('MALL_INTERNAL_PARTICIPANT_TOKEN', ''),
+    ],
+
+    'saga' => [
+        'timeout_seconds' => (int) env('MALL_SAGA_TIMEOUT_SECONDS', 10),
+        'participant_access_key' => env('MALL_SAGA_PARTICIPANT_ACCESS_KEY', ''),
+        'checkout_flow_id' => (int) env('MALL_SAGA_CHECKOUT_FLOW_ID', 0),
+    ],
+
+    'tcc' => [
+        'timeout_seconds' => (int) env('MALL_TCC_TIMEOUT_SECONDS', 15),
+        'branch_meta_points_id' => (int) env('MALL_TCC_BRANCH_META_POINTS_ID', 0),
+    ],
+
+    'outbound' => [
+        'inventory' => [
+            'base_url' => env('MALL_INVENTORY_OUTBOUND_BASE_URL', ''),
+            'timeout_seconds' => (int) env('MALL_INVENTORY_OUTBOUND_TIMEOUT_SECONDS', 5),
+        ],
+    ],
 ];

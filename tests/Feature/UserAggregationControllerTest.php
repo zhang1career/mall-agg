@@ -19,6 +19,7 @@ class UserAggregationControllerTest extends TestCase
 
     public function test_me_returns_foundation_user_with_empty_business_plugins(): void
     {
+        config()->set('api_gw.base_url', 'http://foundation.local');
         config()->set('mall_agg.foundation.base_url', 'http://foundation.local');
         config()->set('mall_agg.foundation.me_endpoint', '/api/user/me');
         config()->set('mall_agg.business_services', []);

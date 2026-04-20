@@ -2,16 +2,24 @@
 
 namespace App\Providers;
 
+use App\Contracts\InventoryOutboundContract;
+use App\Contracts\PaymentOutboundContract;
 use App\Infrastructure\ServiceDiscovery\LaravelRedisStringClient;
 use App\Queue\Connectors\DatabaseMillisConnector;
 use App\Queue\Failed\DatabaseUuidFailedJobProviderMillis;
 use App\Services\api_gw\ResolvedApiGatewayBaseUrl;
+use App\Services\mall\CheckoutOrchestrator;
 use App\Services\mall\MallCatalogService;
+use App\Services\mall\MallPointsTccService;
 use App\Services\mall\OrderCommandService;
 use App\Services\mall\ProductInventoryService;
 use App\Services\mall\ProductPriceService;
 use App\Services\mall\serv_fd\CmsProductClient;
 use App\Services\mall\serv_fd\SearchRecClient;
+use App\Services\Outbound\StubInventoryOutboundClient;
+use App\Services\Outbound\StubPaymentOutboundClient;
+use App\Services\Transaction\SagaCoordinatorClient;
+use App\Services\Transaction\TccCoordinatorClient;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Http;
@@ -26,6 +34,8 @@ use Paganini\ServiceDiscovery\RedisServiceUriResolver;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 
+use function function_exists;
+
 class AppServiceProvider extends ServiceProvider
 {
     /**
@@ -34,7 +44,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(LaravelRedisStringClient::class, function (Application $app) {
-            $conn = (string) config('mall_agg.foundation.service_discovery.redis_connection', 'default');
+            $conn = (string) config('mall_agg.foundation.service_discovery.redis_connection');
 
             return new LaravelRedisStringClient($app['redis']->connection($conn));
         });
@@ -42,16 +52,16 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(ServiceUriResolverInterface::class, function (Application $app) {
             return new RedisServiceUriResolver(
                 $app->make(LaravelRedisStringClient::class),
-                (string) config('mall_agg.foundation.service_discovery.redis_key_prefix', '')
+                (string) config('mall_agg.foundation.service_discovery.redis_key_prefix')
             );
         });
 
         $this->app->singleton(ResolvedApiGatewayBaseUrl::class, function (Application $app) {
-            $ttl = (int) config('mall_agg.foundation.service_discovery.memo_ttl_seconds', 60);
+            $ttl = (int) config('mall_agg.foundation.service_discovery.memo_ttl_seconds');
             if ($ttl < 0) {
                 $ttl = 0;
             }
-            $store = \function_exists('apcu_fetch') ? new ApcuMemoStore('mall_agg.foundation_base') : new ArrayMemoStore;
+            $store = function_exists('apcu_fetch') ? new ApcuMemoStore('mall_agg.foundation_base') : new ArrayMemoStore;
 
             return new ResolvedApiGatewayBaseUrl(
                 $app,
@@ -66,9 +76,15 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(ProductInventoryService::class);
         $this->app->singleton(OrderCommandService::class);
         $this->app->singleton(MallCatalogService::class);
+        $this->app->singleton(InventoryOutboundContract::class, StubInventoryOutboundClient::class);
+        $this->app->singleton(PaymentOutboundContract::class, StubPaymentOutboundClient::class);
+        $this->app->singleton(MallPointsTccService::class);
+        $this->app->singleton(SagaCoordinatorClient::class);
+        $this->app->singleton(TccCoordinatorClient::class);
+        $this->app->singleton(CheckoutOrchestrator::class);
 
         $this->app->singleton(ProviderRegistry::class, function ($app) {
-            $serviceDefs = (array) config('mall_agg.business_services', []);
+            $serviceDefs = (array) config('mall_agg.business_services');
             $serviceClasses = [];
             foreach ($serviceDefs as $def) {
                 if (is_string($def)) {

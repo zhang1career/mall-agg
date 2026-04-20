@@ -1,0 +1,224 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature;
+
+use App\Enums\CheckoutPhase;
+use App\Enums\MallOrderStatus;
+use App\Enums\PointsHoldState;
+use App\Models\MallOrder;
+use App\Models\MallPointsBalance;
+use App\Models\PointsFlow;
+use App\Models\ProductPrice;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Tests\TestCase;
+
+class MallCheckoutControllerTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        config()->set('api_gw.base_url', 'http://foundation.local');
+        config()->set('mall_agg.foundation.base_url', 'http://foundation.local');
+        config()->set('mall_agg.foundation.me_endpoint', '/api/user/me');
+        config()->set('mall_agg.checkout.use_coordinators', true);
+        config()->set('mall_agg.checkout.use_tcc_coordinator', false);
+    }
+
+    public function test_checkout_requires_auth(): void
+    {
+        $response = $this->postJson('/api/mall/checkout', [
+            'lines' => [['product_id' => 1, 'quantity' => 1]],
+        ]);
+
+        $response->assertStatus(401)
+            ->assertJsonPath('errorCode', 40101);
+    }
+
+    public function test_checkout_creates_external_order_and_freezes_points(): void
+    {
+        Http::fake([
+            'http://foundation.local/api/user/me' => Http::response([
+                'errorCode' => 0,
+                'data' => ['id' => 42, 'username' => 'buyer'],
+                'message' => '',
+            ], 200),
+        ]);
+
+        ProductPrice::query()->create([
+            'pid' => 7,
+            'price' => 100,
+            'ct' => 1,
+            'ut' => 1,
+        ]);
+
+        MallPointsBalance::query()->create([
+            'uid' => 42,
+            'balance_minor' => 10_000,
+            'ct' => 1,
+            'ut' => 1,
+        ]);
+
+        $response = $this->withHeader('Authorization', 'Bearer tok')->postJson('/api/mall/checkout', [
+            'lines' => [['product_id' => 7, 'quantity' => 1]],
+            'points_minor' => 100,
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('errorCode', 0)
+            ->assertJsonPath('data.order.status', MallOrderStatus::Pending->value)
+            ->assertJsonPath('data.order.ext_inventory', true)
+            ->assertJsonPath('data.order.checkout_phase', CheckoutPhase::AwaitPayment->value);
+
+        $this->assertSame(9900, (int) MallPointsBalance::query()->where('uid', 42)->value('balance_minor'));
+
+        $hold = PointsFlow::query()->where('uid', 42)->first();
+        $this->assertNotNull($hold);
+        $this->assertSame(100, (int) $hold->amount_minor);
+        $this->assertSame(PointsHoldState::TrySucceeded, $hold->state);
+    }
+
+    public function test_checkout_returns_422_when_coordinator_disabled(): void
+    {
+        config()->set('mall_agg.checkout.use_coordinators', false);
+
+        Http::fake([
+            'http://foundation.local/api/user/me' => Http::response([
+                'errorCode' => 0,
+                'data' => ['id' => 1, 'username' => 'u'],
+                'message' => '',
+            ], 200),
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer tok')->postJson('/api/mall/checkout', [
+            'lines' => [['product_id' => 1, 'quantity' => 1]],
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('errorCode', 40001);
+    }
+
+    public function test_checkout_returns_422_when_lines_invalid(): void
+    {
+        Http::fake([
+            'http://foundation.local/api/user/me' => Http::response([
+                'errorCode' => 0,
+                'data' => ['id' => 1, 'username' => 'u'],
+                'message' => '',
+            ], 200),
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer tok')->postJson('/api/mall/checkout', [
+            'lines' => [],
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('errorCode', 100);
+    }
+
+    public function test_checkout_rejects_insufficient_points(): void
+    {
+        Http::fake([
+            'http://foundation.local/api/user/me' => Http::response([
+                'errorCode' => 0,
+                'data' => ['id' => 99, 'username' => 'u'],
+                'message' => '',
+            ], 200),
+        ]);
+
+        ProductPrice::query()->create([
+            'pid' => 7,
+            'price' => 50,
+            'ct' => 1,
+            'ut' => 1,
+        ]);
+
+        MallPointsBalance::query()->create([
+            'uid' => 99,
+            'balance_minor' => 10,
+            'ct' => 1,
+            'ut' => 1,
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer tok')->postJson('/api/mall/checkout', [
+            'lines' => [['product_id' => 7, 'quantity' => 1]],
+            'points_minor' => 100,
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('errorCode', 40001);
+
+        $this->assertSame(10, (int) MallPointsBalance::query()->where('uid', 99)->value('balance_minor'));
+    }
+
+    public function test_checkout_with_tcc_coordinator_calls_begin_and_sets_order_tid(): void
+    {
+        config()->set('mall_agg.checkout.use_tcc_coordinator', true);
+        config()->set('mall_agg.tcc.branch_meta_points_id', 501);
+
+        Http::fake([
+            'http://foundation.local/api/user/me' => Http::response([
+                'errorCode' => 0,
+                'data' => ['id' => 55, 'username' => 'u'],
+                'message' => '',
+            ], 200),
+            'http://foundation.local/api/tcc/transactions/begin' => Http::response([
+                'errorCode' => 0,
+                'data' => [
+                    'global_tx_id' => 'gtx-coord-99',
+                    'idem_key' => 77_001,
+                ],
+                'message' => '',
+            ], 200),
+        ]);
+
+        ProductPrice::query()->create([
+            'pid' => 8,
+            'price' => 20,
+            'ct' => 1,
+            'ut' => 1,
+        ]);
+
+        MallPointsBalance::query()->create([
+            'uid' => 55,
+            'balance_minor' => 5000,
+            'ct' => 1,
+            'ut' => 1,
+        ]);
+
+        $response = $this->withHeader('Authorization', 'Bearer tok')->postJson('/api/mall/checkout', [
+            'lines' => [['product_id' => 8, 'quantity' => 1]],
+            'points_minor' => 40,
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('errorCode', 0)
+            ->assertJsonPath('data.tid', 'gtx-coord-99');
+
+        $idem = $response->json('data.points_tcc_idem_key');
+        $this->assertIsString($idem);
+        $this->assertStringStartsWith('ord:', (string) $idem);
+
+        $order = MallOrder::query()->first();
+        $this->assertNotNull($order);
+        $this->assertSame('gtx-coord-99', $order->tid);
+        $this->assertSame(77_001, $order->tcc_idem_key);
+
+        $this->assertSame(5000, (int) MallPointsBalance::query()->where('uid', 55)->value('balance_minor'));
+        $this->assertSame(0, (int) PointsFlow::query()->count());
+
+        Http::assertSent(function ($request) {
+            if ($request->url() !== 'http://foundation.local/api/tcc/transactions/begin') {
+                return false;
+            }
+            $body = $request->data();
+            $branches = $body['branches'] ?? null;
+
+            return is_array($branches)
+                && isset($branches[0]['branch_meta_id'])
+                && (int) $branches[0]['branch_meta_id'] === 501
+                && isset($branches[0]['payload']['tcc_idem_key']);
+        });
+    }
+}

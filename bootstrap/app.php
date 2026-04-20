@@ -2,13 +2,16 @@
 
 use App\Components\ApiResponse;
 use App\Http\Middleware\LogApiHttpErrors;
+use App\Http\Middleware\VerifyInternalParticipantToken;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\ValidationException;
 use Paganini\Env\LayeredEnvLoader;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 $app = Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -16,13 +19,22 @@ $app = Application::configure(basePath: dirname(__DIR__))
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
+        then: function () {
+            Route::middleware(['api', VerifyInternalParticipantToken::class])
+                ->prefix('internal')
+                ->group(base_path('routes/internal.php'));
+        },
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->appendToGroup('api', LogApiHttpErrors::class);
+        $middleware->alias([
+            'internal.participant' => VerifyInternalParticipantToken::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (Throwable $exception, Request $request) {
-            if (! str_starts_with($request->path(), 'api/')) {
+            $path = $request->path();
+            if (! str_starts_with($path, 'api/') && ! str_starts_with($path, 'internal/')) {
                 return null;
             }
 
@@ -34,6 +46,15 @@ $app = Application::configure(basePath: dirname(__DIR__))
                 return response()->json(
                     ApiResponse::error(1, $message, $reqId),
                     422
+                );
+            }
+
+            if ($exception instanceof HttpException) {
+                $status = $exception->getStatusCode();
+
+                return response()->json(
+                    ApiResponse::error($status, $exception->getMessage() ?: 'HTTP error', $reqId),
+                    $status
                 );
             }
 

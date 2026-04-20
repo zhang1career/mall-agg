@@ -2,18 +2,20 @@
   "openapi": "3.0.3",
   "info": {
     "title": "mall-agg 用户端 API",
-    "description": "聚合服务对外 HTTP JSON 接口（`routes/api.php`）。业务响应统一为 `ApiResponse` 信封：`data`、`errorCode`、`message`、`_req_id`。成功时 `errorCode` 为 `0`；失败时 `data` 常为空字符串。\n\n管理后台创建/更新商品时，服务端会**同步**调用下游 SearchRec `POST {API_GATEWAY_BASE_URL}/api/searchrec/index/upsert`（需 `MALL_SEARCHREC_ACCESS_KEY`）。该调用为服务端出站，**不**作为本 OpenAPI 路径对外暴露；请求/响应体见 `service_foundation` 的 `docs/api_searchrec.json`。",
-    "version": "1.0.0"
+    "description": "聚合服务对外 HTTP JSON 接口（`routes/api.php`）。业务响应统一为 `ApiResponse` 信封：`data`、`errorCode`、`message`、`_req_id`。成功时 `errorCode` 为 `0`；失败时 `data` 常为空字符串。\n\n**协调式结账**：`POST /api/mall/checkout` 在启用 `MALL_CHECKOUT_USE_COORDINATORS` 时走 Saga/TCC 编排（外部库存预留、积分冻结、支付预创建）；订单 JSON 含 `ext_inventory`、`checkout_phase`、`tid` 等字段。**内部 TCC 参与者**：`POST /internal/tcc/points/*` 由 app_tcc 协调器调用本机积分 Try/Confirm/Cancel，需请求头 `X-Internal-Token`（见 `mall_agg.internal.participant_token`），**不**面向终端用户。\n\n管理后台创建/更新商品时，服务端会**同步**调用下游 SearchRec `POST {API_GATEWAY_BASE_URL}/api/searchrec/index/upsert`（需 `MALL_SEARCHREC_ACCESS_KEY`）。该调用为服务端出站，**不**作为本 OpenAPI 路径对外暴露；请求/响应体见 `service_foundation` 的 `docs/api_searchrec.json`。",
+    "version": "1.1.0"
   },
   "servers": [
     {
       "url": "/",
-      "description": "相对当前站点根路径；完整路径形如 `{origin}/api/...`"
+      "description": "相对当前站点根路径；用户端形如 `{origin}/api/...`；内部参与者形如 `{origin}/internal/...`"
     }
   ],
   "tags": [
     { "name": "MallProducts", "description": "商城商品目录（公开）" },
-    { "name": "MallOrders", "description": "商城订单（需 Bearer）" }
+    { "name": "MallOrders", "description": "商城订单（需 Bearer）" },
+    { "name": "MallCheckout", "description": "协调式结账（需 Bearer；需启用 `MALL_CHECKOUT_USE_COORDINATORS`）" },
+    { "name": "InternalTccPoints", "description": "本机积分 TCC 参与者（供协调器调用；需 `X-Internal-Token`）" }
   ],
   "paths": {
     "/api/mall/products": {
@@ -396,6 +398,189 @@
           }
         }
       }
+    },
+    "/api/mall/checkout": {
+      "post": {
+        "tags": ["MallCheckout"],
+        "summary": "协调式结账（外部库存 + 积分 + 预支付）",
+        "description": "需 `MALL_CHECKOUT_USE_COORDINATORS=true`。库存走外部 HTTP 预留；`points_minor>0` 时在本地冻结积分（直连或通过 `MALL_CHECKOUT_USE_TCC_COORDINATOR` 走 TCC 协调器）。未启用协调器时返回 422，`errorCode` `40001`。",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/TraceId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CheckoutRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "已创建订单并完成预支付创建；`data` 含订单快照、`prepay`、`points_tcc_idem_key`（未使用积分时为 `null`）、`tid`（未走 TCC 协调器时多为空字符串）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "errorCode": { "type": "integer", "example": 0 },
+                        "data": { "$ref": "#/components/schemas/CheckoutResponseData" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未授权",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiEnvelope" }
+              }
+            }
+          },
+          "422": {
+            "description": "请求体验证失败（`errorCode` `100`）、协调器未启用或业务失败（`errorCode` `40001`）。",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiEnvelope" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/tcc/points/try": {
+      "post": {
+        "tags": ["InternalTccPoints"],
+        "summary": "积分 TCC Try（冻结余额）",
+        "description": "协调器分支负载；可将业务字段放在 JSON 根上，或使用 `payload` 对象包裹（二者等价，见控制器解析逻辑）。成功与业务失败均返回 HTTP 200，通过 `errorCode` 区分：`0` 成功，`100` 参数或业务错误。",
+        "security": [{ "internalToken": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/TraceId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TccPointsTryBody" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功时 `errorCode` 为 `0`，`data` 含 `tcc_idem_key`；失败时 `errorCode` 为 `100`。",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiEnvelope" }
+              }
+            }
+          },
+          "403": {
+            "description": "`X-Internal-Token` 缺失或不匹配。",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiEnvelope" }
+              }
+            }
+          },
+          "503": {
+            "description": "未配置 `mall_agg.internal.participant_token`。",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiEnvelope" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/tcc/points/confirm": {
+      "post": {
+        "tags": ["InternalTccPoints"],
+        "summary": "积分 TCC Confirm",
+        "description": "请求体可为根级 `tcc_idem_key`，或包在 `payload` 内。HTTP 200 + `errorCode` 区分结果。",
+        "security": [{ "internalToken": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/TraceId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TccPointsIdemBody" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功时 `data` 含 `tcc_idem_key`；失败时 `errorCode` `100`。",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiEnvelope" }
+              }
+            }
+          },
+          "403": {
+            "description": "Token 无效",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiEnvelope" }
+              }
+            }
+          },
+          "503": {
+            "description": "未配置内部 token",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiEnvelope" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/tcc/points/cancel": {
+      "post": {
+        "tags": ["InternalTccPoints"],
+        "summary": "积分 TCC Cancel（解冻）",
+        "description": "请求体同 Confirm。幂等：已回滚或无记录时可成功返回。",
+        "security": [{ "internalToken": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/TraceId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TccPointsIdemBody" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功时 `data` 含 `tcc_idem_key`；失败时 `errorCode` `100`。",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiEnvelope" }
+              }
+            }
+          },
+          "403": {
+            "description": "Token 无效",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiEnvelope" }
+              }
+            }
+          },
+          "503": {
+            "description": "未配置内部 token",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiEnvelope" }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -405,6 +590,12 @@
                 "scheme": "bearer",
                 "bearerFormat": "JWT",
                 "description": "先通过基础服务登录取得 `access_token`，请求头：`Authorization: Bearer <access_token>`（Bearer 后单空格）。"
+            },
+            "internalToken": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-Internal-Token",
+                "description": "与配置项 `mall_agg.internal.participant_token` 完全一致；未配置时访问内部路由返回 503。"
             }
         },
         "parameters": {
@@ -647,6 +838,131 @@
                     },
                     "total_hits": { "type": "integer" }
                 }
+            },
+            "CheckoutRequest": {
+                "type": "object",
+                "required": ["lines"],
+                "properties": {
+                    "lines": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                            "type": "object",
+                            "required": ["product_id", "quantity"],
+                            "properties": {
+                                "product_id": { "type": "integer", "minimum": 1 },
+                                "quantity": { "type": "integer", "minimum": 1 }
+                            }
+                        }
+                    },
+                    "points_minor": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "使用积分抵扣的额度（最小单位），未传或 `0` 表示不用积分。"
+                    }
+                }
+            },
+            "CheckoutOrderDetail": {
+                "type": "object",
+                "required": ["id", "uid", "status", "total_price", "ct", "ut", "lines", "ext_inventory", "checkout_phase", "tid"],
+                "description": "`POST /api/mall/checkout` 返回的订单快照，在普通 `OrderDetail` 基础上增加协调器相关字段。",
+                "properties": {
+                    "id": { "type": "integer" },
+                    "uid": { "type": "integer", "description": "Foundation 用户 ID" },
+                    "status": {
+                        "type": "integer",
+                        "enum": [0, 1, 2],
+                        "description": "0=pending，1=paid，2=cancelled"
+                    },
+                    "total_price": { "type": "integer" },
+                    "ct": { "type": "integer", "description": "创建时间 Unix 秒" },
+                    "ut": { "type": "integer", "description": "更新时间 Unix 秒" },
+                    "lines": {
+                        "type": "array",
+                        "items": { "$ref": "#/components/schemas/OrderLine" }
+                    },
+                    "ext_inventory": {
+                        "type": "boolean",
+                        "description": "是否使用外部库存预留（协调式结账路径为 `true`）。"
+                    },
+                    "checkout_phase": {
+                        "type": "integer",
+                        "description": "结账阶段枚举 `CheckoutPhase` 的整数值：0=None，10=CoordinatorStarted，20=InventoryReserved，30=OrderCreated，40=PointsTryPending，50=AwaitPayment，60=Completed。"
+                    },
+                    "tid": {
+                        "type": "string",
+                        "description": "TCC 全局事务 id（协调器下发）；未参与 TCC 时为空字符串。"
+                    }
+                }
+            },
+            "PrepayStub": {
+                "type": "object",
+                "description": "当前占位实现 `StubPaymentOutboundClient` 返回；真实支付网关替换后字段以契约为准。",
+                "properties": {
+                    "order_id": { "type": "integer" },
+                    "amount_minor": { "type": "integer" },
+                    "uid": { "type": "integer" },
+                    "status": { "type": "string", "example": "stub_await_payment" }
+                }
+            },
+            "CheckoutResponseData": {
+                "type": "object",
+                "required": ["order", "prepay", "points_tcc_idem_key", "tid"],
+                "properties": {
+                    "order": { "$ref": "#/components/schemas/CheckoutOrderDetail" },
+                    "prepay": { "$ref": "#/components/schemas/PrepayStub" },
+                    "points_tcc_idem_key": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "本单积分分支的 TCC 幂等键；未使用积分时为 `null`。"
+                    },
+                    "tid": {
+                        "type": "string",
+                        "description": "与 `order.tid` 一致；来自 TCC 协调器的全局事务 id。"
+                    }
+                }
+            },
+            "TccPointsTryPayload": {
+                "type": "object",
+                "required": ["uid", "amount_minor", "tcc_idem_key"],
+                "properties": {
+                    "uid": { "type": "integer", "minimum": 1, "description": "Foundation 用户 ID" },
+                    "amount_minor": { "type": "integer", "minimum": 1, "description": "冻结积分数量（最小单位）" },
+                    "order_id": { "type": "integer", "minimum": 1, "description": "可选，关联订单 id" },
+                    "tcc_idem_key": { "type": "string", "minLength": 1, "description": "TCC 幂等键（与 `points_flow.tcc_idem_key` 对应）" }
+                }
+            },
+            "TccPointsTryBody": {
+                "oneOf": [
+                    { "$ref": "#/components/schemas/TccPointsTryPayload" },
+                    {
+                        "type": "object",
+                        "required": ["payload"],
+                        "properties": {
+                            "payload": { "$ref": "#/components/schemas/TccPointsTryPayload" }
+                        }
+                    }
+                ],
+                "description": "根级字段与 `payload` 包裹二选一（见实现解析）。"
+            },
+            "TccPointsIdemPayload": {
+                "type": "object",
+                "required": ["tcc_idem_key"],
+                "properties": {
+                    "tcc_idem_key": { "type": "string", "minLength": 1 }
+                }
+            },
+            "TccPointsIdemBody": {
+                "oneOf": [
+                    { "$ref": "#/components/schemas/TccPointsIdemPayload" },
+                    {
+                        "type": "object",
+                        "required": ["payload"],
+                        "properties": {
+                            "payload": { "$ref": "#/components/schemas/TccPointsIdemPayload" }
+                        }
+                    }
+                ]
             }
         }
     }

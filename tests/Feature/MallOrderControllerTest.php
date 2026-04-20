@@ -15,6 +15,7 @@ class MallOrderControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        config()->set('api_gw.base_url', 'http://foundation.local');
         config()->set('mall_agg.foundation.base_url', 'http://foundation.local');
         config()->set('mall_agg.foundation.me_endpoint', '/api/user/me');
     }

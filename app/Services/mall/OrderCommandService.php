@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\mall;
 
+use App\Enums\CheckoutPhase;
 use App\Enums\MallOrderStatus;
 use App\Models\MallOrder;
 use App\Models\MallOrderItem;
@@ -15,13 +16,11 @@ use RuntimeException;
 final readonly class OrderCommandService
 {
     public function __construct(
-        private ProductPriceService     $prices,
-        private ProductInventoryService $inventory)
-    {
-    }
+        private ProductPriceService $prices,
+        private ProductInventoryService $inventory) {}
 
     /**
-     * @param list<array{product_id: int, quantity: int}> $lines
+     * @param  list<array{product_id: int, quantity: int}>  $lines
      */
     public function createOrder(int $userId, array $lines): MallOrder
     {
@@ -33,8 +32,8 @@ final readonly class OrderCommandService
             /** @var array<int, int> $merged */
             $merged = [];
             foreach ($lines as $line) {
-                $productId = (int)$line['product_id'];
-                $quantity = (int)$line['quantity'];
+                $productId = (int) $line['product_id'];
+                $quantity = (int) $line['quantity'];
                 if ($productId < 1 || $quantity < 1) {
                     throw new RuntimeException('Invalid order line.');
                 }
@@ -46,8 +45,8 @@ final readonly class OrderCommandService
 
             foreach ($merged as $productId => $quantity) {
                 $priceRow = $this->prices->getPriceByProductIds([$productId]);
-                if (!array_key_exists($productId, $priceRow)) {
-                    throw new RuntimeException('Missing price for product ' . $productId);
+                if (! array_key_exists($productId, $priceRow)) {
+                    throw new RuntimeException('Missing price for product '.$productId);
                 }
                 $unit = $priceRow[$productId];
 
@@ -83,20 +82,96 @@ final readonly class OrderCommandService
         });
     }
 
-    public function transitionStatus(MallOrder $order, MallOrderStatus $next): MallOrder
-    {
+    /**
+     * Create pending order without touching local {@see ProductInventoryService}; external inventory must already be reserved.
+     *
+     * @param  list<array{product_id: int, quantity: int}>  $lines
+     */
+    public function createOrderWithExternalInventoryReserved(
+        int $userId,
+        array $lines,
+        string $externalReserveId,
+        ?int $sagaIdemKey = null,
+    ): MallOrder {
+        if ($lines === []) {
+            throw new RuntimeException('Order must contain at least one line.');
+        }
+
+        return DB::transaction(function () use ($userId, $lines, $externalReserveId, $sagaIdemKey): MallOrder {
+            /** @var array<int, int> $merged */
+            $merged = [];
+            foreach ($lines as $line) {
+                $productId = (int) $line['product_id'];
+                $quantity = (int) $line['quantity'];
+                if ($productId < 1 || $quantity < 1) {
+                    throw new RuntimeException('Invalid order line.');
+                }
+                $merged[$productId] = ($merged[$productId] ?? 0) + $quantity;
+            }
+
+            $total = 0;
+            $prepared = [];
+
+            foreach ($merged as $productId => $quantity) {
+                $priceRow = $this->prices->getPriceByProductIds([$productId]);
+                if (! array_key_exists($productId, $priceRow)) {
+                    throw new RuntimeException('Missing price for product '.$productId);
+                }
+                $unit = $priceRow[$productId];
+
+                $lineTotal = $unit * $quantity;
+                $total += $lineTotal;
+                $prepared[] = [
+                    'pid' => $productId,
+                    'quantity' => $quantity,
+                    'unit_price' => $unit,
+                ];
+            }
+
+            $order = new MallOrder([
+                'uid' => $userId,
+                'status' => MallOrderStatus::Pending,
+                'total_price' => $total,
+                'ext_inventory' => true,
+                'ext_id' => $externalReserveId,
+                'checkout_phase' => CheckoutPhase::OrderCreated,
+                'saga_idem_key' => $sagaIdemKey,
+            ]);
+            $order->save();
+
+            foreach ($prepared as $p) {
+                $item = new MallOrderItem([
+                    'oid' => $order->id,
+                    'pid' => $p['pid'],
+                    'quantity' => $p['quantity'],
+                    'unit_price' => $p['unit_price'],
+                ]);
+                $item->save();
+            }
+
+            return $order->load('items');
+        });
+    }
+
+    public function transitionStatus(
+        MallOrder $order,
+        MallOrderStatus $next,
+        bool $restoreLocalInventoryOnCancel = true,
+    ): MallOrder {
         $current = $order->status;
-        if (!$current->canTransitionTo($next)) {
+        if (! $current->canTransitionTo($next)) {
             throw new RuntimeException(
                 sprintf('Cannot transition order %d from %s to %s.', $order->id, $current->value, $next->value)
             );
         }
 
-        return DB::transaction(function () use ($order, $next, $current): MallOrder {
+        return DB::transaction(function () use ($order, $next, $current, $restoreLocalInventoryOnCancel): MallOrder {
             $order->load('items');
             if ($current === MallOrderStatus::Pending && $next === MallOrderStatus::Cancelled) {
-                foreach ($order->items as $item) {
-                    $this->inventory->lockAndIncrement($item->pid, $item->quantity);
+                if ($restoreLocalInventoryOnCancel) {
+                    foreach ($order->items as $item) {
+                        $this->inventory->lockAndIncrement($item->pid, $item->quantity);
+                    }
                 }
             }
 
