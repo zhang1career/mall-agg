@@ -36,7 +36,7 @@ class MallPointsControllerTest extends TestCase
             ], 200),
         ]);
 
-        $this->withHeader('Authorization', 'Bearer tok')->getJson('/api/mall/points')
+        $this->withHeader('X-User-Access-Token', 'tok')->getJson('/api/mall/points')
             ->assertOk()
             ->assertJsonPath('errorCode', 0)
             ->assertJsonPath('data.balance_minor', 0);
@@ -59,7 +59,7 @@ class MallPointsControllerTest extends TestCase
             'ut' => 1,
         ]);
 
-        $this->withHeader('Authorization', 'Bearer tok')->getJson('/api/mall/points')
+        $this->withHeader('X-User-Access-Token', 'tok')->getJson('/api/mall/points')
             ->assertOk()
             ->assertJsonPath('errorCode', 0)
             ->assertJsonPath('data.balance_minor', 12_345);

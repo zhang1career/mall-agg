@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\user;
 
 use App\Exceptions\FoundationAuthRequiredException;
@@ -24,12 +26,12 @@ readonly class UserFoundationGateway
             throw new RuntimeException('Missing user foundation base_url configuration.');
         }
 
-        $timeout = (int)config('mall_agg.foundation.timeout_seconds', 3);
-        $endpoint = (string)config('mall_agg.foundation.me_endpoint', '/api/user/me');
-        $token = (string)$request->bearerToken();
+        $timeout = (int) config('mall_agg.foundation.timeout_seconds', 3);
+        $endpoint = (string) config('mall_agg.foundation.me_endpoint', '/api/user/me');
+        $token = trim((string) $request->header('X-User-Access-Token', ''));
 
         $response = Http::timeout($timeout)
-            ->withToken($token)
+            ->withHeaders(['X-User-Access-Token' => $token])
             ->acceptJson()
             ->get($baseUrl . $endpoint);
 

@@ -159,10 +159,10 @@ class MallOrderController extends Controller
      */
     private function requireAuthenticatedUser(Request $request): array
     {
-        $token = $request->bearerToken();
-        if ($token === null || trim($token) === '') {
+        $token = trim((string) $request->header('X-User-Access-Token', ''));
+        if ($token === '') {
             throw new FoundationAuthRequiredException(
-                'Authorization required. Send Authorization: Bearer <access_token>.'
+                'Authentication required. Send header: X-User-Access-Token: <access_token> (raw JWT, no Bearer prefix).'
             );
         }
 

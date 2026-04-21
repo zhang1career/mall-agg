@@ -53,7 +53,7 @@ class MallOrderControllerTest extends TestCase
             'ut' => 1,
         ]);
 
-        $response = $this->withHeader('Authorization', 'Bearer tok')->postJson('/api/mall/orders', [
+        $response = $this->withHeader('X-User-Access-Token', 'tok')->postJson('/api/mall/orders', [
             'lines' => [['product_id' => 7, 'quantity' => 2]],
         ]);
 

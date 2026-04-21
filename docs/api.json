@@ -13,9 +13,9 @@
   ],
   "tags": [
     { "name": "MallProducts", "description": "商城商品目录（公开）" },
-    { "name": "MallOrders", "description": "商城订单（需 Bearer）" },
-    { "name": "MallPoints", "description": "商城积分余额（需 Bearer；读 `points_balance` 可用余额）" },
-    { "name": "MallCheckout", "description": "协调式结账（需 Bearer；需启用 `MALL_CHECKOUT_USE_COORDINATORS`）" },
+    { "name": "MallOrders", "description": "商城订单（需 `X-User-Access-Token`）" },
+    { "name": "MallPoints", "description": "商城积分余额（需 `X-User-Access-Token`；读 `points_balance` 可用余额）" },
+    { "name": "MallCheckout", "description": "协调式结账（需 `X-User-Access-Token`；需启用 `MALL_CHECKOUT_USE_COORDINATORS`）" },
     { "name": "InternalTccPoints", "description": "本机积分 TCC 参与者（供协调器调用；需 `X-Internal-Token`）" }
   ],
   "paths": {
@@ -181,7 +181,7 @@
         "tags": ["MallPoints"],
         "summary": "当前用户可用积分",
         "description": "返回 Foundation 当前用户在本服务 `points_balance` 表中的可用余额（`balance_minor`，与下单/结账 `points_minor` 同单位）。无账户记录时 `balance_minor` 为 `0`（不自动开户）。",
-        "security": [{ "bearerAuth": [] }],
+        "security": [{ "userAccessToken": [] }],
         "parameters": [{ "$ref": "#/components/parameters/TraceId" }],
         "responses": {
           "200": {
@@ -218,7 +218,7 @@
       "get": {
         "tags": ["MallOrders"],
         "summary": "当前用户订单分页列表",
-        "security": [{ "bearerAuth": [] }],
+        "security": [{ "userAccessToken": [] }],
         "parameters": [
           { "$ref": "#/components/parameters/TraceId" },
           {
@@ -267,7 +267,7 @@
       "post": {
         "tags": ["MallOrders"],
         "summary": "创建订单",
-        "security": [{ "bearerAuth": [] }],
+        "security": [{ "userAccessToken": [] }],
         "parameters": [
           { "$ref": "#/components/parameters/TraceId" }
         ],
@@ -322,7 +322,7 @@
       "get": {
         "tags": ["MallOrders"],
         "summary": "订单详情",
-        "security": [{ "bearerAuth": [] }],
+        "security": [{ "userAccessToken": [] }],
         "parameters": [
           { "$ref": "#/components/parameters/TraceId" },
           {
@@ -373,7 +373,7 @@
       "patch": {
         "tags": ["MallOrders"],
         "summary": "更新订单状态（迁移）",
-        "security": [{ "bearerAuth": [] }],
+        "security": [{ "userAccessToken": [] }],
         "parameters": [
           { "$ref": "#/components/parameters/TraceId" },
           {
@@ -443,7 +443,7 @@
         "tags": ["MallCheckout"],
         "summary": "协调式结账（外部库存 + 积分 + 预支付）",
         "description": "需 `MALL_CHECKOUT_USE_COORDINATORS=true`。库存走外部 HTTP 预留；`points_minor>0` 时在本地冻结积分（直连或通过 `MALL_CHECKOUT_USE_TCC_COORDINATOR` 走 TCC 协调器）。未启用协调器时返回 422，`errorCode` `40001`。",
-        "security": [{ "bearerAuth": [] }],
+        "security": [{ "userAccessToken": [] }],
         "parameters": [{ "$ref": "#/components/parameters/TraceId" }],
         "requestBody": {
           "required": true,
@@ -624,11 +624,11 @@
   },
   "components": {
         "securitySchemes": {
-            "bearerAuth": {
-                "type": "http",
-                "scheme": "bearer",
-                "bearerFormat": "JWT",
-                "description": "先通过基础服务登录取得 `access_token`，请求头：`Authorization: Bearer <access_token>`（Bearer 后单空格）。"
+            "userAccessToken": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-User-Access-Token",
+                "description": "基础服务登录返回的 `access_token`（原始 JWT，勿加 `Bearer ` 前缀）。`Authorization: Bearer` 预留给 API 网关；本聚合服务将本头原样透传至用户中心 `/api/user/me`。"
             },
             "internalToken": {
                 "type": "apiKey",

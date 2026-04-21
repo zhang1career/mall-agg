@@ -8,13 +8,13 @@ use Tests\TestCase;
 
 class UserAggregationControllerTest extends TestCase
 {
-    public function test_me_returns_401_when_authorization_header_missing(): void
+    public function test_me_returns_401_when_user_access_token_missing(): void
     {
         $response = $this->getJson('/api/user/me');
 
         $response->assertStatus(401)
             ->assertJsonPath('errorCode', 40101);
-        $this->assertStringContainsString('Authorization required', (string) $response->json('message'));
+        $this->assertStringContainsString('Authentication required', (string) $response->json('message'));
     }
 
     public function test_me_returns_foundation_user_with_empty_business_plugins(): void
@@ -37,7 +37,7 @@ class UserAggregationControllerTest extends TestCase
         ]);
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer token-abc',
+            'X-User-Access-Token' => 'token-abc',
             'X-Trace-Id' => 'trace-001',
         ])->getJson('/api/user/me');
 

@@ -63,7 +63,7 @@ class MallCheckoutControllerTest extends TestCase
             'ut' => 1,
         ]);
 
-        $response = $this->withHeader('Authorization', 'Bearer tok')->postJson('/api/mall/checkout', [
+        $response = $this->withHeader('X-User-Access-Token', 'tok')->postJson('/api/mall/checkout', [
             'lines' => [['product_id' => 7, 'quantity' => 1]],
             'points_minor' => 100,
         ]);
@@ -94,7 +94,7 @@ class MallCheckoutControllerTest extends TestCase
             ], 200),
         ]);
 
-        $this->withHeader('Authorization', 'Bearer tok')->postJson('/api/mall/checkout', [
+        $this->withHeader('X-User-Access-Token', 'tok')->postJson('/api/mall/checkout', [
             'lines' => [['product_id' => 1, 'quantity' => 1]],
         ])
             ->assertStatus(422)
@@ -111,7 +111,7 @@ class MallCheckoutControllerTest extends TestCase
             ], 200),
         ]);
 
-        $this->withHeader('Authorization', 'Bearer tok')->postJson('/api/mall/checkout', [
+        $this->withHeader('X-User-Access-Token', 'tok')->postJson('/api/mall/checkout', [
             'lines' => [],
         ])
             ->assertStatus(422)
@@ -142,7 +142,7 @@ class MallCheckoutControllerTest extends TestCase
             'ut' => 1,
         ]);
 
-        $this->withHeader('Authorization', 'Bearer tok')->postJson('/api/mall/checkout', [
+        $this->withHeader('X-User-Access-Token', 'tok')->postJson('/api/mall/checkout', [
             'lines' => [['product_id' => 7, 'quantity' => 1]],
             'points_minor' => 100,
         ])
@@ -187,7 +187,7 @@ class MallCheckoutControllerTest extends TestCase
             'ut' => 1,
         ]);
 
-        $response = $this->withHeader('Authorization', 'Bearer tok')->postJson('/api/mall/checkout', [
+        $response = $this->withHeader('X-User-Access-Token', 'tok')->postJson('/api/mall/checkout', [
             'lines' => [['product_id' => 8, 'quantity' => 1]],
             'points_minor' => 40,
         ]);
