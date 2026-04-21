@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Contracts\InventoryOutboundContract;
 use App\Contracts\PaymentOutboundContract;
+use App\Http\Client\OutboundHttpDebugMiddleware;
 use App\Infrastructure\ServiceDiscovery\LaravelRedisStringClient;
 use App\Queue\Connectors\DatabaseMillisConnector;
 use App\Queue\Failed\DatabaseUuidFailedJobProviderMillis;
@@ -23,7 +24,6 @@ use App\Services\Transaction\TccCoordinatorClient;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 use Paganini\Capability\ProviderRegistry;
 use Paganini\Memo\ApcuMemoStore;
@@ -31,8 +31,6 @@ use Paganini\Memo\ArrayMemoStore;
 use Paganini\Memo\Memoizer;
 use Paganini\ServiceDiscovery\Contracts\ServiceUriResolverInterface;
 use Paganini\ServiceDiscovery\RedisServiceUriResolver;
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
 
 use function function_exists;
 
@@ -108,23 +106,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        if (config('mall_agg.http_client.log_outbound')) {
-            Http::globalRequestMiddleware(function (RequestInterface $request) {
-                Log::debug('HTTP outbound request', [
-                    'method' => $request->getMethod(),
-                    'uri' => (string) $request->getUri(),
-                ]);
-
-                return $request;
-            });
-
-            Http::globalResponseMiddleware(function (ResponseInterface $response) {
-                Log::debug('HTTP outbound response', [
-                    'status' => $response->getStatusCode(),
-                ]);
-
-                return $response;
-            });
+        if (config('app.debug')) {
+            Http::globalRequestMiddleware([OutboundHttpDebugMiddleware::class, 'logRequest']);
+            Http::globalResponseMiddleware([OutboundHttpDebugMiddleware::class, 'logResponse']);
         }
 
         Paginator::useBootstrapFive();

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Components\ApiResponse;
+use App\Enums\CheckoutPhase;
 use App\Exceptions\FoundationAuthRequiredException;
 use App\Http\Controllers\Controller;
 use App\Models\MallOrder;
@@ -123,7 +124,7 @@ class MallCheckoutController extends Controller
             'ut' => (int) $order->ut,
             'lines' => $lines,
             'ext_inventory' => (bool) $order->ext_inventory,
-            'checkout_phase' => $order->checkout_phase?->value,
+            'checkout_phase' => $order->checkout_phase?->value ?? CheckoutPhase::None->value,
             'tid' => $order->tid,
         ];
     }
