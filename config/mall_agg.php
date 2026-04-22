@@ -55,6 +55,13 @@ return [
         'use_tcc_coordinator' => (bool) env('MALL_CHECKOUT_USE_TCC_COORDINATOR', false),
     ],
 
+    /*
+    | Pending payment timeout for XXL-Job sweep (milliseconds; order ct/ut use ms).
+    */
+    'orders' => [
+        'pending_payment_timeout_ms' => (int) env('MALL_PENDING_PAYMENT_TIMEOUT_MS', 1_800_000),
+    ],
+
     'internal' => [
         'participant_token' => env('MALL_INTERNAL_PARTICIPANT_TOKEN', ''),
     ],

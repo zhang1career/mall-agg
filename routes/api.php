@@ -8,7 +8,15 @@ use App\Http\Controllers\Api\MallPointsController;
 use App\Http\Controllers\Api\MallProductController;
 use App\Http\Controllers\Api\PaymentCallbackController;
 use App\Http\Controllers\UserAggregationController;
+use App\Http\Controllers\XxlJobController;
+use App\Http\Middleware\XxljobAuthentication;
 use Illuminate\Support\Facades\Route;
+
+Route::prefix('xxl-job')->middleware([XxljobAuthentication::class])->group(function () {
+    Route::get('beat', [XxlJobController::class, 'beat']);
+    Route::post('run', [XxlJobController::class, 'run']);
+    Route::post('kill', [XxlJobController::class, 'kill']);
+});
 
 Route::prefix('')->middleware([])->group(function () {
     Route::get('user/me', [UserAggregationController::class, 'me']);

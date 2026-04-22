@@ -45,9 +45,7 @@ final readonly class CheckoutOrchestrator
 
         if ($order->checkout_phase === CheckoutPhase::AwaitPayment
             && $order->points_deduct_minor === $pointsMinor) {
-            $cashPayable = $order->cash_payable_minor > 0
-                ? $order->cash_payable_minor
-                : ($order->total_price - $pointsMinor);
+            $cashPayable = $order->total_price - $pointsMinor;
             $prepay = $this->payment->createPrepay($order->id, $cashPayable, $uid);
 
             return [

@@ -11,7 +11,7 @@ legend right
   | 订单落库 | 持久化抵扣额、应付现金（payable）便于对账 |
   | 幂等策略 | 第二步允许换新 prepay（若支付渠道允许）；回调按 order_id 防重复入账 |
   | 闭环 | 仅以**支付渠道异步回调**落账；与 TCC/Saga **Confirm** 先后顺序见项目文档写死 |
-  | 超时关单 | **XXL-Job** worker（**job-executor** 项目）关单释资源，非本图主链路 |
+  | 超时关单 | **XXL-Job** 调本服务 **POST /api/xxl-job/run**（同步执行 handler）关单释资源 |
 endlegend
 
 |#E3F2FD|手机端|
@@ -131,21 +131,16 @@ stop
 
 
 @startuml pay_overdue_close_worker
-title 待支付超时 — XXL-Job（job-executor）关单\n（异步，不阻塞用户支付主路径）
+title 待支付超时 — XXL-Job 调 mall-agg **/api/xxl-job/run**\n（同步执行，handler 如 closeExpiredOrders）
 
-|#F3E5F5|XXL-Job_job_executor|
+|#F3E5F5|XXL-Job_Admin|
 start
-:定时触发 / 分片扫描;
-:调用 mall_agg **内部或管理 API**\n（以 job-executor 与 mall_agg 约定为准）;
-:关单 + 释放预留/库存\n+ 必要时撤销未确认 TCC;
+:调度触发;
+:HTTP POST /api/xxl-job/run\n(executorHandler = closeExpiredOrders);
 
 |#E8F5E9|mall_agg|
-:订单 **Cancelled**;\n资源回收;
+:关单 + 释放预留/库存\n+ TCC/积分补偿;
 
 stop
-
-note bottom
-  实现细节见 **job-executor** 仓库；\n本 mall-agg 仅实现被调用的关单与补偿逻辑。
-end note
 
 @enduml

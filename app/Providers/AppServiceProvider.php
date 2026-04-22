@@ -8,9 +8,12 @@ use App\Http\Client\OutboundHttpDebugMiddleware;
 use App\Infrastructure\ServiceDiscovery\LaravelRedisStringClient;
 use App\Queue\Connectors\DatabaseMillisConnector;
 use App\Queue\Failed\DatabaseUuidFailedJobProviderMillis;
+use App\Services\api_gw\MemoizedServiceDiscoveryUrl;
 use App\Services\api_gw\ResolvedApiGatewayBaseUrl;
+use App\Services\api_gw\ResolvedXxlJobAdminAddress;
 use App\Services\mall\CheckoutOrchestrator;
 use App\Services\mall\MallCatalogService;
+use App\Services\mall\MallOverdueOrderSweepService;
 use App\Services\mall\MallPointsTccService;
 use App\Services\mall\OrderCommandService;
 use App\Services\mall\ProductInventoryService;
@@ -21,6 +24,7 @@ use App\Services\Outbound\StubInventoryOutboundClient;
 use App\Services\Outbound\StubPaymentOutboundClient;
 use App\Services\Transaction\SagaCoordinatorClient;
 use App\Services\Transaction\TccCoordinatorClient;
+use App\Services\XxlJobRegistry;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Http;
@@ -54,17 +58,29 @@ class AppServiceProvider extends ServiceProvider
             );
         });
 
-        $this->app->singleton(ResolvedApiGatewayBaseUrl::class, function (Application $app) {
+        $this->app->singleton(MemoizedServiceDiscoveryUrl::class, function (Application $app) {
             $ttl = (int) config('mall_agg.foundation.service_discovery.memo_ttl_seconds');
             if ($ttl < 0) {
                 $ttl = 0;
             }
             $store = function_exists('apcu_fetch') ? new ApcuMemoStore('mall_agg.foundation_base') : new ArrayMemoStore;
 
-            return new ResolvedApiGatewayBaseUrl(
+            return new MemoizedServiceDiscoveryUrl(
                 $app,
                 new Memoizer($store),
                 $ttl
+            );
+        });
+
+        $this->app->singleton(ResolvedApiGatewayBaseUrl::class, function (Application $app) {
+            return new ResolvedApiGatewayBaseUrl(
+                $app->make(MemoizedServiceDiscoveryUrl::class)
+            );
+        });
+
+        $this->app->singleton(ResolvedXxlJobAdminAddress::class, function (Application $app) {
+            return new ResolvedXxlJobAdminAddress(
+                $app->make(MemoizedServiceDiscoveryUrl::class)
             );
         });
 
@@ -80,6 +96,14 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(SagaCoordinatorClient::class);
         $this->app->singleton(TccCoordinatorClient::class);
         $this->app->singleton(CheckoutOrchestrator::class);
+        $this->app->singleton(MallOverdueOrderSweepService::class);
+
+        $this->app->singleton(XxlJobRegistry::class, function () {
+            $registry = new XxlJobRegistry;
+            $registry->scanAndRegister('Jobs');
+
+            return $registry;
+        });
 
         $this->app->singleton(ProviderRegistry::class, function ($app) {
             $serviceDefs = (array) config('mall_agg.business_services');
