@@ -1,6 +1,3 @@
-/**
- * Theme + sidebar: behavior aligned with service_foundation app_console static console/js/main.js
- */
 (function () {
     'use strict';
 
@@ -27,7 +24,7 @@
 
     function applyTheme(theme) {
         var isDark = theme === DARK;
-        document.documentElement.classList.toggle('theme-dark', isDark);
+        document.documentElement.setAttribute('data-bs-theme', isDark ? 'dark' : 'light');
         var cb = document.getElementById('theme-toggle');
         if (cb) {
             cb.checked = !isDark;

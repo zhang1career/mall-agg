@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminOrderController;
+use App\Http\Controllers\Admin\AdminPointsController;
 use App\Http\Controllers\Admin\AdminProductController;
 use App\Http\Controllers\Admin\AdminUploadController;
 use Illuminate\Support\Facades\Route;
@@ -15,4 +16,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::get('orders', [AdminOrderController::class, 'index'])->name('orders.index');
     Route::get('orders/{id}', [AdminOrderController::class, 'show'])->name('orders.show');
     Route::patch('orders/{id}', [AdminOrderController::class, 'update'])->name('orders.update');
+
+    Route::get('points', [AdminPointsController::class, 'index'])->name('points.index');
+    Route::post('points/accounts', [AdminPointsController::class, 'storeAccount'])->name('points.accounts.store');
+    Route::post('points/adjust', [AdminPointsController::class, 'adjust'])->name('points.adjust');
 });

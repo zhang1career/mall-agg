@@ -10,14 +10,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Points TCC branch rows (try / confirm / cancel); table `points_flow`.
+ * Points ledger rows: TCC hold lifecycle (try / confirm / cancel) and manual admin entries (`AdminLedger`).
  *
  * @property int $id
  * @property int $uid
  * @property int $oid 0 = not linked to an order
  * @property int $amount_minor Points amount in minor units (same scale as balance_minor); 0 = none
  * @property PointsHoldState $state
- * @property string|null $tcc_idem_key TCC idempotency key; null when not yet assigned (unique when set; avoid '' with DB unique)
+ * @property string|null $tcc_idem_key TCC idempotency key; null for admin ledger rows or unassigned (unique when set)
  * @property int $ct
  * @property int $ut
  */
@@ -44,7 +44,6 @@ class PointsFlow extends Model
         'oid' => 'integer',
         'amount_minor' => 'integer',
         'state' => PointsHoldState::class,
-        'tcc_idem_key' => 'string',
         'ct' => 'integer',
         'ut' => 'integer',
     ];

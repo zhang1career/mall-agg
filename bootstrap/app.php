@@ -2,6 +2,7 @@
 
 use App\Components\ApiResponse;
 use App\Http\Middleware\LogApiHttpErrors;
+use App\Http\Middleware\VerifyAdminApiToken;
 use App\Http\Middleware\VerifyInternalParticipantToken;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -29,6 +30,7 @@ $app = Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('api', LogApiHttpErrors::class);
         $middleware->alias([
             'internal.participant' => VerifyInternalParticipantToken::class,
+            'admin.api' => VerifyAdminApiToken::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

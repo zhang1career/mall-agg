@@ -59,6 +59,10 @@ return [
         'participant_token' => env('MALL_INTERNAL_PARTICIPANT_TOKEN', ''),
     ],
 
+    'admin' => [
+        'api_token' => env('MALL_ADMIN_API_TOKEN', ''),
+    ],
+
     'saga' => [
         'timeout_seconds' => (int) env('MALL_SAGA_TIMEOUT_SECONDS', 10),
         'participant_access_key' => env('MALL_SAGA_PARTICIPANT_ACCESS_KEY', ''),

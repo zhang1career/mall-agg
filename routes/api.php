@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\MallAdminPointsController;
 use App\Http\Controllers\Api\MallCheckoutController;
 use App\Http\Controllers\Api\MallOrderController;
 use App\Http\Controllers\Api\MallPointsController;
@@ -22,5 +23,10 @@ Route::prefix('')->middleware([])->group(function () {
         Route::get('points', [MallPointsController::class, 'show']);
         Route::post('checkout', [MallCheckoutController::class, 'store']);
         Route::post('payment/callback', PaymentCallbackController::class);
+
+        Route::prefix('admin')->middleware(['admin.api'])->group(function () {
+            Route::post('points/accounts', [MallAdminPointsController::class, 'storeAccount']);
+            Route::post('points/adjust', [MallAdminPointsController::class, 'adjust']);
+        });
     });
 });
