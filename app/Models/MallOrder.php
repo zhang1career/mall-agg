@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $uid Foundation user id (from GET /api/user/me)
  * @property MallOrderStatus $status Stored as integer (see MallOrderStatus backed values)
  * @property int $total_price Order total in minor units (e.g. cents); denormalized at creation from line items
+ * @property int $points_deduct_minor Points applied at checkout (minor units); 0 until checkout
+ * @property int $cash_payable_minor Third-party cash amount after points (total_price − points_deduct_minor); 0 until checkout
  * @property int $ct
  * @property int $ut
  * @property int|null $saga_idem_key null = not assigned (unique when set)
@@ -39,6 +41,8 @@ class MallOrder extends Model
         'uid',
         'status',
         'total_price',
+        'points_deduct_minor',
+        'cash_payable_minor',
         'ct',
         'ut',
         'saga_idem_key',
@@ -53,6 +57,8 @@ class MallOrder extends Model
         'uid' => 'integer',
         'status' => MallOrderStatus::class,
         'total_price' => 'integer',
+        'points_deduct_minor' => 'integer',
+        'cash_payable_minor' => 'integer',
         'ct' => 'integer',
         'ut' => 'integer',
         'saga_idem_key' => 'integer',

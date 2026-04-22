@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Components\ApiResponse;
+use App\Enums\CheckoutPhase;
 use App\Enums\MallOrderStatus;
 use App\Exceptions\FoundationAuthRequiredException;
 use App\Http\Controllers\Controller;
@@ -56,7 +57,7 @@ class MallOrderController extends Controller
         }
 
         try {
-            $order = $this->orders->createOrder(FoundationUser::id($user), $lines);
+            $order = $this->orders->createPendingOrderForCheckout(FoundationUser::id($user), $lines);
         } catch (RuntimeException $e) {
             return response()->json(ApiResponse::error(40001, $e->getMessage()), 422);
         }
@@ -201,9 +202,15 @@ class MallOrderController extends Controller
             'uid' => (int) $order->uid,
             'status' => $order->status->value,
             'total_price' => (int) $order->total_price,
+            'points_deduct_minor' => (int) $order->points_deduct_minor,
+            'cash_payable_minor' => (int) $order->cash_payable_minor,
             'ct' => (int) $order->ct,
             'ut' => (int) $order->ut,
             'lines' => $lines,
+            'ext_inventory' => (bool) $order->ext_inventory,
+            'ext_id' => $order->ext_id,
+            'checkout_phase' => $order->checkout_phase?->value ?? CheckoutPhase::None->value,
+            'tid' => $order->tid,
         ];
     }
 

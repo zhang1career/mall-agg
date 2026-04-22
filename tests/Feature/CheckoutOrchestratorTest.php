@@ -9,8 +9,10 @@ use App\Contracts\PaymentOutboundContract;
 use App\Enums\MallOrderStatus;
 use App\Models\MallOrder;
 use App\Models\MallPointsBalance;
+use App\Models\ProductInventory;
 use App\Models\ProductPrice;
 use App\Services\mall\CheckoutOrchestrator;
+use App\Services\mall\OrderCommandService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Mockery;
@@ -18,7 +20,7 @@ use RuntimeException;
 use Tests\TestCase;
 
 /**
- * 结账编排应用层：失败时补偿（库存 release、本地积分 cancel、TCC 协调器 HTTP cancel）。
+ * 结账编排：两步支付第二步；失败时补偿（库存 release、本地积分 cancel、TCC 协调器 HTTP cancel）。
  *
  * @group checkout-orchestrator
  * @group tcc
@@ -79,6 +81,15 @@ final class CheckoutOrchestratorTest extends TestCase
             'ut' => 1,
         ]);
 
+        $inventory = Mockery::mock(InventoryOutboundContract::class);
+        $inventory->shouldReceive('reserve')->once()->andReturn(['reserve_id' => 'rev-tcc-1']);
+        $inventory->shouldReceive('release')->once()->with('rev-tcc-1');
+        $this->app->instance(InventoryOutboundContract::class, $inventory);
+        $this->app->forgetInstance(OrderCommandService::class);
+        $this->app->forgetInstance(CheckoutOrchestrator::class);
+
+        $order = app(OrderCommandService::class)->createPendingOrderForCheckout(900, [['product_id' => 501, 'quantity' => 1]]);
+
         $payment = Mockery::mock(PaymentOutboundContract::class);
         $payment->shouldReceive('createPrepay')->once()->andThrow(new RuntimeException('prepay gateway down'));
 
@@ -86,7 +97,7 @@ final class CheckoutOrchestratorTest extends TestCase
         $this->app->forgetInstance(CheckoutOrchestrator::class);
 
         try {
-            app(CheckoutOrchestrator::class)->checkout(900, [['product_id' => 501, 'quantity' => 1]], 50);
+            app(CheckoutOrchestrator::class)->checkoutExistingOrder(900, $order, 25);
             $this->fail('Expected RuntimeException.');
         } catch (RuntimeException $e) {
             $this->assertStringContainsString('prepay gateway down', $e->getMessage());
@@ -108,10 +119,17 @@ final class CheckoutOrchestratorTest extends TestCase
     public function test_prepay_failure_restores_points_for_local_tcc_try(): void
     {
         config()->set('mall_agg.checkout.use_tcc_coordinator', false);
+        config()->set('mall_agg.checkout.use_coordinators', false);
 
         ProductPrice::query()->create([
             'pid' => 502,
             'price' => 10,
+            'ct' => 1,
+            'ut' => 1,
+        ]);
+        ProductInventory::query()->create([
+            'pid' => 502,
+            'quantity' => 50,
             'ct' => 1,
             'ut' => 1,
         ]);
@@ -123,6 +141,9 @@ final class CheckoutOrchestratorTest extends TestCase
             'ut' => 1,
         ]);
 
+        $this->app->forgetInstance(OrderCommandService::class);
+        $order = app(OrderCommandService::class)->createPendingOrderForCheckout(901, [['product_id' => 502, 'quantity' => 1]]);
+
         $payment = Mockery::mock(PaymentOutboundContract::class);
         $payment->shouldReceive('createPrepay')->once()->andThrow(new RuntimeException('prepay fail'));
 
@@ -130,7 +151,7 @@ final class CheckoutOrchestratorTest extends TestCase
         $this->app->forgetInstance(CheckoutOrchestrator::class);
 
         try {
-            app(CheckoutOrchestrator::class)->checkout(901, [['product_id' => 502, 'quantity' => 1]], 80);
+            app(CheckoutOrchestrator::class)->checkoutExistingOrder(901, $order, 5);
             $this->fail('Expected RuntimeException.');
         } catch (RuntimeException $e) {
             $this->assertStringContainsString('prepay fail', $e->getMessage());
@@ -147,7 +168,7 @@ final class CheckoutOrchestratorTest extends TestCase
     }
 
     /**
-     * 无积分分支：仅保留库存预留与订单，失败时 release 外部预留。
+     * 无积分分支：仅释放外部预留。
      */
     public function test_prepay_failure_releases_inventory_when_no_points(): void
     {
@@ -169,10 +190,13 @@ final class CheckoutOrchestratorTest extends TestCase
 
         $this->app->instance(InventoryOutboundContract::class, $inventory);
         $this->app->instance(PaymentOutboundContract::class, $payment);
+        $this->app->forgetInstance(OrderCommandService::class);
         $this->app->forgetInstance(CheckoutOrchestrator::class);
 
+        $order = app(OrderCommandService::class)->createPendingOrderForCheckout(1, [['product_id' => 600, 'quantity' => 1]]);
+
         try {
-            app(CheckoutOrchestrator::class)->checkout(1, [['product_id' => 600, 'quantity' => 1]], 0);
+            app(CheckoutOrchestrator::class)->checkoutExistingOrder(1, $order, 0);
             $this->fail('Expected RuntimeException.');
         } catch (RuntimeException) {
         }
@@ -180,5 +204,48 @@ final class CheckoutOrchestratorTest extends TestCase
         $order = MallOrder::query()->first();
         $this->assertNotNull($order);
         $this->assertSame(MallOrderStatus::Cancelled, $order->status);
+    }
+
+    public function test_create_prepay_uses_cash_after_points(): void
+    {
+        config()->set('mall_agg.checkout.use_tcc_coordinator', false);
+        config()->set('mall_agg.checkout.use_coordinators', false);
+
+        ProductPrice::query()->create([
+            'pid' => 88,
+            'price' => 1000,
+            'ct' => 1,
+            'ut' => 1,
+        ]);
+        ProductInventory::query()->create([
+            'pid' => 88,
+            'quantity' => 20,
+            'ct' => 1,
+            'ut' => 1,
+        ]);
+
+        MallPointsBalance::query()->create([
+            'uid' => 33,
+            'balance_minor' => 5000,
+            'ct' => 1,
+            'ut' => 1,
+        ]);
+
+        $this->app->forgetInstance(OrderCommandService::class);
+        $order = app(OrderCommandService::class)->createPendingOrderForCheckout(33, [['product_id' => 88, 'quantity' => 1]]);
+
+        $payment = Mockery::mock(PaymentOutboundContract::class);
+        $payment->shouldReceive('createPrepay')
+            ->once()
+            ->withArgs(fn (int $oid, int $amt, int $u) => $oid === $order->id && $amt === 700 && $u === 33)
+            ->andReturn(['stub' => true]);
+
+        $this->app->instance(PaymentOutboundContract::class, $payment);
+        $this->app->forgetInstance(CheckoutOrchestrator::class);
+
+        $result = app(CheckoutOrchestrator::class)->checkoutExistingOrder(33, $order, 300);
+
+        $this->assertSame(700, (int) $result['order']->cash_payable_minor);
+        $this->assertSame(300, (int) $result['order']->points_deduct_minor);
     }
 }

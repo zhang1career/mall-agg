@@ -64,4 +64,35 @@ class MallOrderControllerTest extends TestCase
 
         $this->assertSame(1, (int) ProductInventory::query()->where('pid', 7)->value('quantity'));
     }
+
+    public function test_create_order_uses_external_reserve_when_coordinators_enabled(): void
+    {
+        config()->set('mall_agg.checkout.use_coordinators', true);
+
+        Http::fake([
+            'http://foundation.local/api/user/me' => Http::response([
+                'errorCode' => 0,
+                'data' => ['id' => 99, 'username' => 'buyer'],
+                'message' => '',
+            ], 200),
+        ]);
+
+        ProductPrice::query()->create([
+            'pid' => 11,
+            'price' => 25,
+            'ct' => 1,
+            'ut' => 1,
+        ]);
+
+        $response = $this->withHeader('X-User-Access-Token', 'tok')->postJson('/api/mall/orders', [
+            'lines' => [['product_id' => 11, 'quantity' => 2]],
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('errorCode', 0)
+            ->assertJsonPath('data.total_price', 50);
+
+        $this->assertTrue((bool) $response->json('data.ext_inventory'));
+        $this->assertNotSame('', (string) $response->json('data.ext_id'));
+    }
 }

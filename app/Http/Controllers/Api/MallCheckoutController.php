@@ -11,7 +11,9 @@ use App\Http\Controllers\Controller;
 use App\Models\MallOrder;
 use App\Services\mall\CheckoutOrchestrator;
 use App\Services\mall\FoundationUser;
+use App\Services\mall\OrderCommandService;
 use App\Services\user\UserFoundationGateway;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -21,6 +23,7 @@ class MallCheckoutController extends Controller
 {
     public function __construct(
         private readonly UserFoundationGateway $foundationGateway,
+        private readonly OrderCommandService $orders,
         private readonly CheckoutOrchestrator $checkout,
     ) {}
 
@@ -33,31 +36,24 @@ class MallCheckoutController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'lines' => 'required|array|min:1',
-            'lines.*.product_id' => 'required|integer|min:1',
-            'lines.*.quantity' => 'required|integer|min:1',
+            'order_id' => 'required|integer|min:1',
             'points_minor' => 'sometimes|integer|min:0',
         ]);
         if ($validator->fails()) {
             return response()->json(ApiResponse::error(100, $validator->errors()->first()), 422);
         }
 
-        /** @var list<array{product_id: int, quantity: int}> $lines */
-        $lines = [];
-        foreach ($request->input('lines', []) as $line) {
-            if (! is_array($line)) {
-                continue;
-            }
-            $lines[] = [
-                'product_id' => (int) $line['product_id'],
-                'quantity' => (int) $line['quantity'],
-            ];
-        }
-
+        $orderId = (int) $request->input('order_id');
         $pointsMinor = (int) $request->input('points_minor', 0);
 
         try {
-            $result = $this->checkout->checkout(FoundationUser::id($user), $lines, $pointsMinor);
+            $order = $this->orders->findForUser($orderId, FoundationUser::id($user));
+        } catch (ModelNotFoundException) {
+            return response()->json(ApiResponse::error(40401, 'Order not found.'), 404);
+        }
+
+        try {
+            $result = $this->checkout->checkoutExistingOrder(FoundationUser::id($user), $order, $pointsMinor);
         } catch (RuntimeException $e) {
             return response()->json(ApiResponse::error(40001, $e->getMessage()), 422);
         }
@@ -120,6 +116,8 @@ class MallCheckoutController extends Controller
             'uid' => (int) $order->uid,
             'status' => $order->status->value,
             'total_price' => (int) $order->total_price,
+            'points_deduct_minor' => (int) $order->points_deduct_minor,
+            'cash_payable_minor' => (int) $order->cash_payable_minor,
             'ct' => (int) $order->ct,
             'ut' => (int) $order->ut,
             'lines' => $lines,

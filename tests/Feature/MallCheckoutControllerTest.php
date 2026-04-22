@@ -10,6 +10,7 @@ use App\Enums\PointsHoldState;
 use App\Models\MallOrder;
 use App\Models\MallPointsBalance;
 use App\Models\PointsFlow;
+use App\Models\ProductInventory;
 use App\Models\ProductPrice;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -29,10 +30,21 @@ class MallCheckoutControllerTest extends TestCase
         config()->set('mall_agg.checkout.use_tcc_coordinator', false);
     }
 
+    private function fakeUserMe(int $userId): void
+    {
+        Http::fake([
+            'http://foundation.local/api/user/me' => Http::response([
+                'errorCode' => 0,
+                'data' => ['id' => $userId, 'username' => 'buyer'],
+                'message' => '',
+            ], 200),
+        ]);
+    }
+
     public function test_checkout_requires_auth(): void
     {
         $response = $this->postJson('/api/mall/checkout', [
-            'lines' => [['product_id' => 1, 'quantity' => 1]],
+            'order_id' => 1,
         ]);
 
         $response->assertStatus(401)
@@ -41,13 +53,7 @@ class MallCheckoutControllerTest extends TestCase
 
     public function test_checkout_creates_external_order_and_freezes_points(): void
     {
-        Http::fake([
-            'http://foundation.local/api/user/me' => Http::response([
-                'errorCode' => 0,
-                'data' => ['id' => 42, 'username' => 'buyer'],
-                'message' => '',
-            ], 200),
-        ]);
+        $this->fakeUserMe(42);
 
         ProductPrice::query()->create([
             'pid' => 7,
@@ -63,8 +69,14 @@ class MallCheckoutControllerTest extends TestCase
             'ut' => 1,
         ]);
 
-        $response = $this->withHeader('X-User-Access-Token', 'tok')->postJson('/api/mall/checkout', [
+        $create = $this->withHeader('X-User-Access-Token', 'tok')->postJson('/api/mall/orders', [
             'lines' => [['product_id' => 7, 'quantity' => 1]],
+        ]);
+        $create->assertCreated();
+        $orderId = (int) $create->json('data.id');
+
+        $response = $this->withHeader('X-User-Access-Token', 'tok')->postJson('/api/mall/checkout', [
+            'order_id' => $orderId,
             'points_minor' => 100,
         ]);
 
@@ -72,7 +84,10 @@ class MallCheckoutControllerTest extends TestCase
             ->assertJsonPath('errorCode', 0)
             ->assertJsonPath('data.order.status', MallOrderStatus::Pending->value)
             ->assertJsonPath('data.order.ext_inventory', true)
-            ->assertJsonPath('data.order.checkout_phase', CheckoutPhase::AwaitPayment->value);
+            ->assertJsonPath('data.order.checkout_phase', CheckoutPhase::AwaitPayment->value)
+            ->assertJsonPath('data.order.points_deduct_minor', 100)
+            ->assertJsonPath('data.order.cash_payable_minor', 0)
+            ->assertJsonPath('data.prepay.amount_minor', 0);
 
         $this->assertSame(9900, (int) MallPointsBalance::query()->where('uid', 42)->value('balance_minor'));
 
@@ -82,51 +97,65 @@ class MallCheckoutControllerTest extends TestCase
         $this->assertSame(PointsHoldState::TrySucceeded, $hold->state);
     }
 
-    public function test_checkout_returns_422_when_coordinator_disabled(): void
+    public function test_checkout_works_when_coordinator_disabled_two_step(): void
     {
         config()->set('mall_agg.checkout.use_coordinators', false);
 
-        Http::fake([
-            'http://foundation.local/api/user/me' => Http::response([
-                'errorCode' => 0,
-                'data' => ['id' => 1, 'username' => 'u'],
-                'message' => '',
-            ], 200),
+        $this->fakeUserMe(1);
+
+        ProductPrice::query()->create([
+            'pid' => 1,
+            'price' => 50,
+            'ct' => 1,
+            'ut' => 1,
+        ]);
+        ProductInventory::query()->create([
+            'pid' => 1,
+            'quantity' => 5,
+            'ct' => 1,
+            'ut' => 1,
         ]);
 
-        $this->withHeader('X-User-Access-Token', 'tok')->postJson('/api/mall/checkout', [
+        $create = $this->withHeader('X-User-Access-Token', 'tok')->postJson('/api/mall/orders', [
             'lines' => [['product_id' => 1, 'quantity' => 1]],
+        ]);
+        $create->assertCreated();
+        $orderId = (int) $create->json('data.id');
+
+        $this->withHeader('X-User-Access-Token', 'tok')->postJson('/api/mall/checkout', [
+            'order_id' => $orderId,
         ])
-            ->assertStatus(422)
-            ->assertJsonPath('errorCode', 40001);
+            ->assertCreated()
+            ->assertJsonPath('errorCode', 0)
+            ->assertJsonPath('data.order.cash_payable_minor', 50)
+            ->assertJsonPath('data.prepay.amount_minor', 50);
     }
 
-    public function test_checkout_returns_422_when_lines_invalid(): void
+    public function test_checkout_returns_422_when_order_id_invalid(): void
     {
-        Http::fake([
-            'http://foundation.local/api/user/me' => Http::response([
-                'errorCode' => 0,
-                'data' => ['id' => 1, 'username' => 'u'],
-                'message' => '',
-            ], 200),
-        ]);
+        $this->fakeUserMe(1);
 
         $this->withHeader('X-User-Access-Token', 'tok')->postJson('/api/mall/checkout', [
-            'lines' => [],
+            'order_id' => 0,
         ])
             ->assertStatus(422)
             ->assertJsonPath('errorCode', 100);
     }
 
+    public function test_checkout_returns_404_when_order_not_found(): void
+    {
+        $this->fakeUserMe(1);
+
+        $this->withHeader('X-User-Access-Token', 'tok')->postJson('/api/mall/checkout', [
+            'order_id' => 99999,
+        ])
+            ->assertStatus(404)
+            ->assertJsonPath('errorCode', 40401);
+    }
+
     public function test_checkout_rejects_insufficient_points(): void
     {
-        Http::fake([
-            'http://foundation.local/api/user/me' => Http::response([
-                'errorCode' => 0,
-                'data' => ['id' => 99, 'username' => 'u'],
-                'message' => '',
-            ], 200),
-        ]);
+        $this->fakeUserMe(99);
 
         ProductPrice::query()->create([
             'pid' => 7,
@@ -142,9 +171,14 @@ class MallCheckoutControllerTest extends TestCase
             'ut' => 1,
         ]);
 
-        $this->withHeader('X-User-Access-Token', 'tok')->postJson('/api/mall/checkout', [
+        $create = $this->withHeader('X-User-Access-Token', 'tok')->postJson('/api/mall/orders', [
             'lines' => [['product_id' => 7, 'quantity' => 1]],
-            'points_minor' => 100,
+        ]);
+        $orderId = (int) $create->json('data.id');
+
+        $this->withHeader('X-User-Access-Token', 'tok')->postJson('/api/mall/checkout', [
+            'order_id' => $orderId,
+            'points_minor' => 30,
         ])
             ->assertStatus(422)
             ->assertJsonPath('errorCode', 40001);
@@ -187,20 +221,27 @@ class MallCheckoutControllerTest extends TestCase
             'ut' => 1,
         ]);
 
-        $response = $this->withHeader('X-User-Access-Token', 'tok')->postJson('/api/mall/checkout', [
+        $create = $this->withHeader('X-User-Access-Token', 'tok')->postJson('/api/mall/orders', [
             'lines' => [['product_id' => 8, 'quantity' => 1]],
-            'points_minor' => 40,
+        ]);
+        $orderId = (int) $create->json('data.id');
+
+        $response = $this->withHeader('X-User-Access-Token', 'tok')->postJson('/api/mall/checkout', [
+            'order_id' => $orderId,
+            'points_minor' => 5,
         ]);
 
         $response->assertCreated()
             ->assertJsonPath('errorCode', 0)
-            ->assertJsonPath('data.tid', 'gtx-coord-99');
+            ->assertJsonPath('data.tid', 'gtx-coord-99')
+            ->assertJsonPath('data.order.cash_payable_minor', 15)
+            ->assertJsonPath('data.prepay.amount_minor', 15);
 
         $idem = $response->json('data.points_tcc_idem_key');
         $this->assertIsString($idem);
         $this->assertStringStartsWith('ord:', (string) $idem);
 
-        $order = MallOrder::query()->first();
+        $order = MallOrder::query()->find($orderId);
         $this->assertNotNull($order);
         $this->assertSame('gtx-coord-99', $order->tid);
         $this->assertSame(77_001, $order->tcc_idem_key);

@@ -24,29 +24,49 @@ final readonly class CheckoutOrchestrator
     ) {}
 
     /**
-     * @param  list<array{product_id: int, quantity: int}>  $lines
+     * Step 2: existing pending order — points try (optional), then cash prepay for (total_price − points).
+     *
      * @return array{order: MallOrder, prepay: array<string, mixed>, points_tcc_idem_key: string|null, tid: string}
      */
-    public function checkout(int $uid, array $lines, int $pointsMinor = 0): array
+    public function checkoutExistingOrder(int $uid, MallOrder $order, int $pointsMinor): array
     {
-        if (! (bool) config('mall_agg.checkout.use_coordinators', false)) {
-            throw new RuntimeException('Coordinator checkout is disabled. Use POST /api/mall/orders or enable MALL_CHECKOUT_USE_COORDINATORS.');
+        if ($order->uid !== $uid) {
+            throw new RuntimeException('Order does not belong to the current user.');
+        }
+        if ($order->status !== MallOrderStatus::Pending) {
+            throw new RuntimeException('Order is not pending checkout.');
+        }
+        if ($pointsMinor < 0 || $pointsMinor > $order->total_price) {
+            throw new RuntimeException('Invalid points_minor.');
         }
 
         $useTccCoordinator = (bool) config('mall_agg.checkout.use_tcc_coordinator', false);
         $branchMetaPoints = (int) config('mall_agg.tcc.branch_meta_points_id', 0);
 
-        $reserveId = null;
-        $order = null;
+        if ($order->checkout_phase === CheckoutPhase::AwaitPayment
+            && $order->points_deduct_minor === $pointsMinor) {
+            $cashPayable = $order->cash_payable_minor > 0
+                ? $order->cash_payable_minor
+                : ($order->total_price - $pointsMinor);
+            $prepay = $this->payment->createPrepay($order->id, $cashPayable, $uid);
+
+            return [
+                'order' => $order->fresh(['items']),
+                'prepay' => $prepay,
+                'points_tcc_idem_key' => null,
+                'tid' => $order->tid,
+            ];
+        }
+
+        $allowedFirstPhases = [CheckoutPhase::None, CheckoutPhase::OrderCreated];
+        if (! in_array($order->checkout_phase, $allowedFirstPhases, true)) {
+            throw new RuntimeException('Order cannot be checked out in the current phase.');
+        }
+
         $pointsTccIdemKey = null;
         $globalTxId = null;
 
         try {
-            $reserved = $this->inventory->reserve($uid, $lines);
-            $reserveId = $reserved['reserve_id'];
-
-            $order = $this->orders->createOrderWithExternalInventoryReserved($uid, $lines, $reserveId, null);
-
             if ($pointsMinor > 0) {
                 $pointsTccIdemKey = 'ord:'.$order->id.':'.bin2hex(random_bytes(8));
                 if ($useTccCoordinator) {
@@ -78,11 +98,17 @@ final readonly class CheckoutOrchestrator
                 } else {
                     $this->pointsTcc->tryFreeze($uid, $pointsMinor, $order->id, $pointsTccIdemKey);
                 }
+                $order->points_deduct_minor = $pointsMinor;
+                $order->cash_payable_minor = $order->total_price - $pointsMinor;
                 $order->checkout_phase = CheckoutPhase::PointsTryPending;
+                $order->save();
+            } else {
+                $order->points_deduct_minor = 0;
+                $order->cash_payable_minor = $order->total_price;
                 $order->save();
             }
 
-            $prepay = $this->payment->createPrepay($order->id, $order->total_price, $uid);
+            $prepay = $this->payment->createPrepay($order->id, $order->cash_payable_minor, $uid);
             $order->checkout_phase = CheckoutPhase::AwaitPayment;
             $order->save();
 
@@ -99,21 +125,23 @@ final readonly class CheckoutOrchestrator
                 } catch (Throwable) {
                 }
             }
-            if ($order !== null) {
+            if ($order->status === MallOrderStatus::Pending) {
+                $extId = $order->ext_inventory ? trim($order->ext_id) : '';
+                $restoreLocal = ! $order->ext_inventory;
                 try {
-                    $this->orders->transitionStatus($order, MallOrderStatus::Cancelled, false);
+                    $this->orders->transitionStatus($order, MallOrderStatus::Cancelled, $restoreLocal);
                 } catch (Throwable) {
+                }
+                if ($order->ext_inventory && $extId !== '') {
+                    try {
+                        $this->inventory->release($extId);
+                    } catch (Throwable) {
+                    }
                 }
             }
             if ($pointsTccIdemKey !== null && ! $useTccCoordinator) {
                 try {
                     $this->pointsTcc->cancel($pointsTccIdemKey);
-                } catch (Throwable) {
-                }
-            }
-            if ($reserveId !== null) {
-                try {
-                    $this->inventory->release($reserveId);
                 } catch (Throwable) {
                 }
             }

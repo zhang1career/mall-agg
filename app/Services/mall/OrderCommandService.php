@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\mall;
 
+use App\Contracts\InventoryOutboundContract;
 use App\Enums\CheckoutPhase;
 use App\Enums\MallOrderStatus;
 use App\Models\MallOrder;
@@ -17,7 +18,30 @@ final readonly class OrderCommandService
 {
     public function __construct(
         private ProductPriceService $prices,
-        private ProductInventoryService $inventory) {}
+        private ProductInventoryService $inventory,
+        private InventoryOutboundContract $inventoryOutbound,
+    ) {}
+
+    /**
+     * Step 1: create pending order with unified resource lock (local decrement or external reserve per config).
+     *
+     * @param  list<array{product_id: int, quantity: int}>  $lines
+     */
+    public function createPendingOrderForCheckout(int $userId, array $lines): MallOrder
+    {
+        if ((bool) config('mall_agg.checkout.use_coordinators', false)) {
+            $reserved = $this->inventoryOutbound->reserve($userId, $lines);
+
+            return $this->createOrderWithExternalInventoryReserved(
+                $userId,
+                $lines,
+                $reserved['reserve_id'],
+                null,
+            );
+        }
+
+        return $this->createOrder($userId, $lines);
+    }
 
     /**
      * @param  list<array{product_id: int, quantity: int}>  $lines
@@ -65,6 +89,7 @@ final readonly class OrderCommandService
                 'uid' => $userId,
                 'status' => MallOrderStatus::Pending,
                 'total_price' => $total,
+                'checkout_phase' => CheckoutPhase::None,
             ]);
             $order->save();
 
