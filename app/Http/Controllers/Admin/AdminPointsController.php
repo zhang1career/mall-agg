@@ -21,12 +21,40 @@ class AdminPointsController extends Controller
 
     public function index(Request $request): View
     {
+        $tab = $request->query('tab') === 'flows' ? 'flows' : 'balances';
         $perPage = min(50, max(1, (int) $request->query('per_page', 15)));
 
+        if ($tab === 'balances') {
+            $balances = MallPointsBalance::query()->orderByDesc('id')->paginate($perPage)->withQueryString();
+
+            return view('admin.points.index', [
+                'tab' => $tab,
+                'balances' => $balances,
+                'flows' => null,
+            ]);
+        }
+
+        $flows = PointsFlow::query()->orderByDesc('id')->paginate($perPage)->withQueryString();
+
         return view('admin.points.index', [
-            'balances' => MallPointsBalance::query()->orderByDesc('id')->paginate($perPage),
-            'recentFlows' => PointsFlow::query()->orderByDesc('id')->limit(25)->get(),
+            'tab' => $tab,
+            'balances' => null,
+            'flows' => $flows,
         ]);
+    }
+
+    public function showBalance(int $id): View
+    {
+        $row = MallPointsBalance::query()->findOrFail($id);
+
+        return view('admin.points.balances.show', ['balance' => $row]);
+    }
+
+    public function showFlow(int $id): View
+    {
+        $row = PointsFlow::query()->findOrFail($id);
+
+        return view('admin.points.flows.show', ['flow' => $row]);
     }
 
     public function storeAccount(Request $request): RedirectResponse
@@ -39,10 +67,12 @@ class AdminPointsController extends Controller
         try {
             $this->adminPoints->openAccount((int) $d['uid'], (int) ($d['balance_minor'] ?? 0));
         } catch (RuntimeException $e) {
-            return back()->withErrors(['account' => $e->getMessage()])->withInput();
+            return redirect()->route('admin.points.index', ['tab' => 'balances'])
+                ->withErrors(['account' => $e->getMessage()])
+                ->withInput();
         }
 
-        return redirect()->route('admin.points.index')->with('status', 'Points account created.');
+        return redirect()->route('admin.points.index', ['tab' => 'balances'])->with('status', 'Points account created.');
     }
 
     public function adjust(Request $request): RedirectResponse
@@ -60,9 +90,35 @@ class AdminPointsController extends Controller
                 (int) ($d['oid'] ?? 0),
             );
         } catch (RuntimeException $e) {
-            return back()->withErrors(['adjust' => $e->getMessage()])->withInput();
+            return redirect()->route('admin.points.index', ['tab' => 'balances'])
+                ->withErrors(['adjust' => $e->getMessage()])
+                ->withInput();
         }
 
-        return redirect()->route('admin.points.index')->with('status', 'Points balance updated.');
+        return redirect()->route('admin.points.index', ['tab' => 'balances'])->with('status', 'Points balance updated.');
+    }
+
+    public function destroyBalance(int $id): RedirectResponse
+    {
+        try {
+            $this->adminPoints->deleteBalanceById($id);
+        } catch (RuntimeException $e) {
+            return redirect()->route('admin.points.index', ['tab' => 'balances'])
+                ->withErrors(['delete' => $e->getMessage()]);
+        }
+
+        return redirect()->route('admin.points.index', ['tab' => 'balances'])->with('status', 'Account deleted.');
+    }
+
+    public function destroyFlow(int $id): RedirectResponse
+    {
+        try {
+            $this->adminPoints->deleteFlowById($id);
+        } catch (RuntimeException $e) {
+            return redirect()->route('admin.points.index', ['tab' => 'flows'])
+                ->withErrors(['delete' => $e->getMessage()]);
+        }
+
+        return redirect()->route('admin.points.index', ['tab' => 'flows'])->with('status', 'Flow row deleted.');
     }
 }

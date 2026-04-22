@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\MallAdminPointsController;
 use App\Http\Controllers\Api\MallCheckoutController;
+use App\Http\Controllers\Api\MallDictController;
 use App\Http\Controllers\Api\MallOrderController;
 use App\Http\Controllers\Api\MallPointsController;
 use App\Http\Controllers\Api\MallProductController;
@@ -13,6 +14,7 @@ Route::prefix('')->middleware([])->group(function () {
     Route::get('user/me', [UserAggregationController::class, 'me']);
 
     Route::prefix('mall')->group(function () {
+        Route::get('dict', MallDictController::class);
         Route::get('products', [MallProductController::class, 'index']);
         Route::post('products/search', [MallProductController::class, 'search']);
         Route::get('products/{id}', [MallProductController::class, 'show'])->whereNumber('id');

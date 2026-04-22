@@ -7,7 +7,8 @@
         <p><strong>Uid:</strong> {{ $order->uid }}</p>
         <p><strong>Status:</strong> {{ $order->status->label() }} ({{ $order->status->value }})</p>
         <p><strong>Total (minor):</strong> {{ $order->total_price }}</p>
-        <p><strong>ct / ut (ms):</strong> {{ $order->ct }} / {{ $order->ut }}</p>
+        <p><strong>ct / ut:</strong> {{ \App\Support\MillisTimestampDisplay::format($order->ct) }}
+            / {{ \App\Support\MillisTimestampDisplay::format($order->ut) }}</p>
     </div>
 
     <h2 class="h5">Lines</h2>

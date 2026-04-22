@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Models\MallPointsBalance;
 use App\Models\PointsFlow;
 use App\Services\mall\MallPointsAdminService;
+use App\Support\MillisTimestampDisplay;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -84,8 +85,8 @@ final class MallAdminPointsController extends Controller
             'id' => $b->id,
             'uid' => $b->uid,
             'balance_minor' => $b->balance_minor,
-            'ct' => $b->ct,
-            'ut' => $b->ut,
+            'ct' => MillisTimestampDisplay::format($b->ct),
+            'ut' => MillisTimestampDisplay::format($b->ut),
         ];
     }
 
@@ -99,8 +100,8 @@ final class MallAdminPointsController extends Controller
             'amount_minor' => $f->amount_minor,
             'state' => $f->state->value,
             'tcc_idem_key' => $f->tcc_idem_key,
-            'ct' => $f->ct,
-            'ut' => $f->ut,
+            'ct' => MillisTimestampDisplay::format($f->ct),
+            'ut' => MillisTimestampDisplay::format($f->ut),
         ];
     }
 }

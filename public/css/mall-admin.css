@@ -229,3 +229,30 @@ html[data-bs-theme="dark"] .bg-gray-100 {
 html[data-bs-theme="dark"] .border-gray-200 {
     border-color: #4b5563 !important;
 }
+
+.mall-list-toolbar h2,
+.mall-subnav {
+    color: var(--bs-emphasis-color, inherit);
+}
+
+.mall-icon-btn {
+    line-height: 0;
+    border: none;
+    background: transparent;
+    color: var(--bs-body-color);
+    cursor: pointer;
+}
+
+.mall-icon-btn:hover {
+    background: var(--bs-tertiary-bg);
+    color: var(--bs-emphasis-color);
+}
+
+.mall-icon-btn.text-danger:hover {
+    background: rgba(185, 28, 28, 0.25);
+    color: #fecaca;
+}
+
+.mall-icon-svg {
+    display: block;
+}

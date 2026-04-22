@@ -10,6 +10,7 @@ use App\Models\MallOrder;
 use App\Services\mall\OrderCommandService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use RuntimeException;
 use ValueError;
@@ -27,7 +28,10 @@ class AdminOrderController extends Controller
             ->orderByDesc('id')
             ->paginate($perPage);
 
-        return view('admin.orders.index', ['orders' => $orders]);
+        return view('admin.orders.index', [
+            'orders' => $orders,
+            'statuses' => MallOrderStatus::cases(),
+        ]);
     }
 
     public function show(int $id): View
@@ -66,7 +70,26 @@ class AdminOrderController extends Controller
             return back()->withErrors(['status' => $e->getMessage()]);
         }
 
+        if ($request->input('redirect_to') === 'list') {
+            return redirect()->route('admin.orders.index')->with('status', 'Order updated.');
+        }
+
         return redirect()->route('admin.orders.show', $id)
             ->with('status', 'Order updated.');
+    }
+
+    public function destroy(int $id): RedirectResponse
+    {
+        $order = MallOrder::query()->with('items')->find($id);
+        if ($order === null) {
+            abort(404);
+        }
+
+        DB::transaction(static function () use ($order): void {
+            $order->items()->delete();
+            $order->delete();
+        });
+
+        return redirect()->route('admin.orders.index')->with('status', 'Order deleted.');
     }
 }

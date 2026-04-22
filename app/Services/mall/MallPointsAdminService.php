@@ -74,6 +74,34 @@ final class MallPointsAdminService
         });
     }
 
+    public function deleteBalanceById(int $id): void
+    {
+        DB::transaction(function () use ($id): void {
+            $row = MallPointsBalance::query()->where('id', $id)->lockForUpdate()->first();
+            if ($row === null) {
+                throw new RuntimeException('Account not found.');
+            }
+            if ((int) $row->balance_minor !== 0) {
+                throw new RuntimeException('Balance must be zero before delete.');
+            }
+            $row->delete();
+        });
+    }
+
+    public function deleteFlowById(int $id): void
+    {
+        DB::transaction(function () use ($id): void {
+            $row = PointsFlow::query()->where('id', $id)->lockForUpdate()->first();
+            if ($row === null) {
+                throw new RuntimeException('Flow row not found.');
+            }
+            if ($row->state !== PointsHoldState::AdminLedger) {
+                throw new RuntimeException('Only admin ledger rows can be deleted here.');
+            }
+            $row->delete();
+        });
+    }
+
     private function insertLedgerRow(int $uid, int $oid, int $amountMinor): PointsFlow
     {
         $flow = new PointsFlow([
