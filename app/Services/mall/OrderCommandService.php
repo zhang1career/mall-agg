@@ -160,7 +160,7 @@ final readonly class OrderCommandService
                 'ext_inventory' => true,
                 'ext_id' => $externalReserveId,
                 'checkout_phase' => CheckoutPhase::OrderCreated,
-                'saga_idem_key' => $sagaIdemKey ?? 0,
+                'saga_idem_key' => $sagaIdemKey,
             ]);
             $order->save();
 
