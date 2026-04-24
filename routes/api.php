@@ -1,12 +1,12 @@
 <?php
 
-use App\Http\Controllers\Api\MallAdminPointsController;
-use App\Http\Controllers\Api\MallCheckoutController;
-use App\Http\Controllers\Api\MallDictController;
-use App\Http\Controllers\Api\MallOrderController;
-use App\Http\Controllers\Api\MallPointsController;
-use App\Http\Controllers\Api\MallProductController;
-use App\Http\Controllers\Api\PaymentCallbackController;
+use App\Http\Controllers\api\MallAdminPointsController;
+use App\Http\Controllers\api\MallCheckoutController;
+use App\Http\Controllers\api\MallDictController;
+use App\Http\Controllers\api\MallOrderController;
+use App\Http\Controllers\api\MallPointsController;
+use App\Http\Controllers\api\MallProductController;
+use App\Http\Controllers\api\PaymentCallbackController;
 use App\Http\Controllers\UserAggregationController;
 use App\Http\Controllers\XxlJobController;
 use App\Http\Middleware\XxljobAuthentication;

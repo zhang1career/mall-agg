@@ -70,14 +70,15 @@ return [
         ],
 
         'single' => array_merge([
-            'driver' => 'single',
+            'driver' => 'app_today',
             'path' => '/var/log/project/mall-agg/app.log',
+            'days' => env('LOG_DAILY_DAYS', 7),
             'level' => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
         ], $defaultFileLogFormatter),
 
         'daily' => array_merge([
-            'driver' => 'daily',
+            'driver' => 'app_today',
             'path' => '/var/log/project/mall-agg/app.log',
             'level' => env('LOG_LEVEL', 'debug'),
             'days' => env('LOG_DAILY_DAYS', 7),

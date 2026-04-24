@@ -19,17 +19,13 @@ final class InventoryParticipantController extends Controller
 
     public function action(Request $request): JsonResponse
     {
-        $data = $this->payload($request);
+        $data = $this->sagaParticipantData($request);
         $uid = (int) ($data['uid'] ?? 0);
         $idem = (string) ($data['saga_step_idem_key'] ?? '');
-        $reuse = isset($data['reuse_inventory_token']) ? (string) $data['reuse_inventory_token'] : null;
-        if ($reuse === '') {
-            $reuse = null;
-        }
 
         try {
             $lines = $this->linesFromPayload($data);
-            $out = $this->inventory->actionPhase($uid, $lines, $idem, $reuse);
+            $out = $this->inventory->actionPhase($uid, $lines, $idem);
         } catch (RuntimeException $e) {
             return response()->json(ApiResponse::error(100, $e->getMessage()), 200);
         }
@@ -93,5 +89,22 @@ final class InventoryParticipantController extends Controller
         $all = $request->all();
 
         return is_array($all) ? $all : [];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function sagaParticipantData(Request $request): array
+    {
+        $data = $this->payload($request);
+        if (trim((string) ($data['saga_step_idem_key'] ?? '')) === '') {
+            $sid = trim((string) $request->input('saga_instance_id', ''));
+            $step = trim((string) $request->input('step_index', ''));
+            if ($sid !== '' && $step !== '') {
+                $data['saga_step_idem_key'] = $sid.':'.$step;
+            }
+        }
+
+        return $data;
     }
 }

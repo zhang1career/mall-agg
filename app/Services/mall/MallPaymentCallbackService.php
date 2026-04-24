@@ -13,7 +13,7 @@ use App\Services\Transaction\TccCoordinatorClient;
 use RuntimeException;
 
 /**
- * Payment gateway success path: commit inventory hold, confirm points (TCC or local), mark order paid.
+ * Payment gateway success path: commit inventory hold, TCC confirm, mark order paid.
  */
 final readonly class MallPaymentCallbackService
 {
@@ -22,7 +22,6 @@ final readonly class MallPaymentCallbackService
         private InternalOrderParticipantService $orderParticipant,
         private InternalInventoryParticipantService $inventoryParticipant,
         private TccCoordinatorClient $tccClient,
-        private MallPointsTccService $pointsTcc,
     ) {}
 
     /**
@@ -61,15 +60,11 @@ final readonly class MallPaymentCallbackService
             $this->inventoryParticipant->confirmPhase($invToken);
         }
 
-        if ((bool) config('mall_agg.checkout.use_tcc_coordinator', false) && $tid !== '') {
-            $this->tccClient->confirm($tid);
-        } elseif ((int) $order->points_deduct_minor > 0) {
-            $pk = isset($payload['points_tcc_idem_key']) ? trim((string) $payload['points_tcc_idem_key']) : '';
-            if ($pk === '') {
-                throw new RuntimeException('points_tcc_idem_key is required when confirming local points deduction.');
-            }
-            $this->pointsTcc->confirm($pk);
+        $coordIdem = $order->tcc_idem_key;
+        if ($coordIdem === null || $coordIdem < 1) {
+            throw new RuntimeException('Order is missing tcc_idem_key; cannot confirm TCC transaction.');
         }
+        $this->tccClient->confirm((string) $coordIdem);
 
         $order = $this->orderParticipant->confirmPaid($orderId);
         $order->checkout_phase = CheckoutPhase::Completed;

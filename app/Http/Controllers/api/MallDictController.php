@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\api;
 
 use App\Components\ApiResponse;
 use App\Http\Controllers\Controller;
@@ -16,7 +16,7 @@ final class MallDictController extends Controller
     {
         $reqId = $request->header('X-Request-Id') ?: '';
         $codesRaw = $request->query('codes');
-        if (! is_string($codesRaw) || trim($codesRaw) === '') {
+        if (!is_string($codesRaw) || trim($codesRaw) === '') {
             return response()->json(ApiResponse::error(101, 'codes is required', $reqId));
         }
 

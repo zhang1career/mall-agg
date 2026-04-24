@@ -16,15 +16,20 @@ final readonly class TccCoordinatorClient
     ) {}
 
     /**
-     * @param  array<string, mixed>  $body
+     * @param  array<string, mixed>  $body  Must include `branches` (see OpenAPI TccBeginRequest). `biz_id` is set from config.
      * @return array<string, mixed>
      */
     public function begin(array $body): array
     {
-        $url = $this->gateway->resolvePathSuffix('/api/tcc/transactions/begin');
+        $url = $this->gateway->resolvePathSuffix('/api/tcc/tx');
         if ($url === '') {
             throw new RuntimeException('API gateway base URL is not configured.');
         }
+        $bizId = (int) config('mall_agg.tcc.flow_id', 0);
+        if ($bizId < 1) {
+            throw new RuntimeException('mall_agg.tcc.flow_id (MALL_TCC_FLOW_ID) is not configured.');
+        }
+        $body['biz_id'] = $bizId;
         $timeout = (int) config('mall_agg.tcc.timeout_seconds', 15);
         $response = Http::timeout($timeout)->acceptJson()->asJson()->post($url, $body);
         if (! $response->successful()) {
@@ -37,24 +42,18 @@ final readonly class TccCoordinatorClient
     /**
      * @return array<string, mixed>
      */
-    public function detail(?int $idemKey = null, ?string $globalTxId = null): array
+    public function detail(int|string $idemKey): array
     {
-        if ($idemKey === null && $globalTxId === null) {
-            throw new RuntimeException('idem_key or global_tx_id required.');
+        $key = trim((string) $idemKey);
+        if ($key === '' || ! ctype_digit($key)) {
+            throw new RuntimeException('idem_key must be a non-empty decimal string.');
         }
-        $url = $this->gateway->resolvePathSuffix('/api/tcc/transactions/detail');
+        $url = $this->gateway->resolvePathSuffix('/api/tcc/tx/'.rawurlencode($key));
         if ($url === '') {
             throw new RuntimeException('API gateway base URL is not configured.');
         }
         $timeout = (int) config('mall_agg.tcc.timeout_seconds', 15);
-        $query = [];
-        if ($idemKey !== null) {
-            $query['idem_key'] = $idemKey;
-        }
-        if ($globalTxId !== null) {
-            $query['global_tx_id'] = $globalTxId;
-        }
-        $response = Http::timeout($timeout)->acceptJson()->get($url, $query);
+        $response = Http::timeout($timeout)->acceptJson()->get($url);
         if (! $response->successful()) {
             throw new RuntimeException('TCC detail HTTP '.$response->status());
         }
@@ -65,9 +64,13 @@ final readonly class TccCoordinatorClient
     /**
      * @return array<string, mixed>
      */
-    public function confirm(string $globalTxId): array
+    public function confirm(int|string $idemKey): array
     {
-        $url = $this->gateway->resolvePathSuffix('/api/tcc/tx/'.$globalTxId.'/confirm');
+        $key = trim((string) $idemKey);
+        if ($key === '' || ! ctype_digit($key)) {
+            throw new RuntimeException('idem_key must be a non-empty decimal string.');
+        }
+        $url = $this->gateway->resolvePathSuffix('/api/tcc/tx/'.rawurlencode($key).'/confirm');
         if ($url === '') {
             throw new RuntimeException('API gateway base URL is not configured.');
         }
@@ -83,9 +86,13 @@ final readonly class TccCoordinatorClient
     /**
      * @return array<string, mixed>
      */
-    public function cancel(string $globalTxId, TccCancelReason $reason = TccCancelReason::Unpaid): array
+    public function cancel(int|string $idemKey, TccCancelReason $reason = TccCancelReason::Unpaid): array
     {
-        $url = $this->gateway->resolvePathSuffix('/api/tcc/tx/'.$globalTxId.'/cancel');
+        $key = trim((string) $idemKey);
+        if ($key === '' || ! ctype_digit($key)) {
+            throw new RuntimeException('idem_key must be a non-empty decimal string.');
+        }
+        $url = $this->gateway->resolvePathSuffix('/api/tcc/tx/'.rawurlencode($key).'/cancel');
         if ($url === '') {
             throw new RuntimeException('API gateway base URL is not configured.');
         }

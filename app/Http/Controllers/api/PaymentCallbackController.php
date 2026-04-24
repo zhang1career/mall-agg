@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\api;
 
 use App\Components\ApiResponse;
 use App\Http\Controllers\Controller;
@@ -56,7 +56,7 @@ final class PaymentCallbackController extends Controller
         $this->logHandledApiRequest($request, ['handler' => 'payment.callback', 'order_id' => $order->id]);
 
         return response()->json(ApiResponse::ok([
-            'order_id' => (int) $order->id,
+            'order_id' => $order->id,
             'status' => $order->status->value,
         ]));
     }

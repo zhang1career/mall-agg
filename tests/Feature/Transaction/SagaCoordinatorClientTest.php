@@ -52,29 +52,31 @@ final class SagaCoordinatorClientTest extends TestCase
         });
     }
 
-    public function test_detail_get_by_idem_key_queries_instances_detail(): void
+    public function test_get_instance_uses_path_param_per_openapi(): void
     {
         Http::fake([
-            'http://gw.test/api/saga/instances/detail*' => Http::response([
+            'http://gw.test/api/saga/instances/42' => Http::response([
                 'errorCode' => 0,
-                'data' => ['state' => 'running'],
+                'data' => [
+                    'saga_instance_id' => '42',
+                    'idem_key' => 12_001,
+                    'context' => ['k' => 1],
+                    'step_runs' => [],
+                ],
                 'message' => '',
             ], 200),
         ]);
 
         $client = app(SagaCoordinatorClient::class);
-        $detail = $client->detail(12_001);
+        $detail = $client->getInstance('42');
 
-        $this->assertSame(['state' => 'running'], $detail);
+        $this->assertSame(['k' => 1], $detail['context']);
         Http::assertSent(function ($request) {
             if ($request->method() !== 'GET') {
                 return false;
             }
-            $u = parse_url((string) $request->url());
 
-            return ($u['host'] ?? '') === 'gw.test'
-                && ($u['path'] ?? '') === '/api/saga/instances/detail'
-                && (($u['query'] ?? '') === 'idem_key=12001');
+            return (string) $request->url() === 'http://gw.test/api/saga/instances/42';
         });
     }
 

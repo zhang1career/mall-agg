@@ -45,7 +45,6 @@ final class XxlJobControllerTest extends TestCase
     {
         // Callback uses Guzzle directly; not intercepted by Http::fake. Admin may be unreachable in CI; sweep still runs.
         config()->set('mall_agg.orders.pending_payment_timeout_ms', 60_000);
-        config()->set('mall_agg.checkout.use_saga_coordinators', false);
 
         ProductPrice::query()->create([
             'pid' => 1,
@@ -61,7 +60,7 @@ final class XxlJobControllerTest extends TestCase
         ]);
 
         $order = app(OrderCommandService::class)
-            ->createPendingOrderForCheckout(7, [['product_id' => 1, 'quantity' => 1]]);
+            ->createDraftPendingOrder(7, [['product_id' => 1, 'quantity' => 1]]);
 
         MallOrder::query()->where('id', $order->id)->update([
             'ct' => MallOrder::nowMillis() - 120_000,

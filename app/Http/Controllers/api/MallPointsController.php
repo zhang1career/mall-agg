@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\api;
 
 use App\Components\ApiResponse;
 use App\Exceptions\FoundationAuthRequiredException;
@@ -42,6 +42,7 @@ class MallPointsController extends Controller
 
     /**
      * @return array<string, mixed>
+     * @throws FoundationAuthRequiredException
      */
     private function requireAuthenticatedUser(Request $request): array
     {

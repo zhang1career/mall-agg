@@ -20,18 +20,21 @@ final class OrderParticipantController extends Controller
 
     public function action(Request $request): JsonResponse
     {
-        $data = $this->payload($request);
+        $data = $this->sagaParticipantData($request);
         $uid = (int) ($data['uid'] ?? 0);
+        $orderId = (int) ($data['order_id'] ?? 0);
         $inventoryToken = (string) ($data['inventory_token'] ?? '');
         $idem = (string) ($data['saga_step_idem_key'] ?? '');
-        $sagaIdemKey = isset($data['saga_idem_key']) ? (int) $data['saga_idem_key'] : null;
-        if ($sagaIdemKey !== null && $sagaIdemKey < 1) {
-            $sagaIdemKey = null;
-        }
+        $sagaIdemKey = (int) ($data['saga_idem_key'] ?? 0);
 
         try {
-            $lines = $this->linesFromPayload($data);
-            $out = $this->orders->actionPhase($uid, $lines, $inventoryToken, $idem, $sagaIdemKey);
+            $out = $this->orders->bindDraftOrderAfterInventory(
+                $orderId,
+                $uid,
+                $inventoryToken,
+                $idem,
+                $sagaIdemKey,
+            );
         } catch (RuntimeException $e) {
             return response()->json(ApiResponse::error(100, $e->getMessage()), 200);
         }
@@ -59,35 +62,6 @@ final class OrderParticipantController extends Controller
     }
 
     /**
-     * @param  array<string, mixed>  $data
-     * @return list<array{product_id: int, quantity: int}>
-     */
-    private function linesFromPayload(array $data): array
-    {
-        $raw = $data['lines'] ?? null;
-        if (! is_array($raw)) {
-            throw new RuntimeException('lines must be an array.');
-        }
-
-        $lines = [];
-        foreach ($raw as $line) {
-            if (! is_array($line)) {
-                continue;
-            }
-            $lines[] = [
-                'product_id' => (int) ($line['product_id'] ?? 0),
-                'quantity' => (int) ($line['quantity'] ?? 0),
-            ];
-        }
-
-        if ($lines === []) {
-            throw new RuntimeException('lines must contain at least one line.');
-        }
-
-        return $lines;
-    }
-
-    /**
      * @return array<string, mixed>
      */
     private function payload(Request $request): array
@@ -100,5 +74,38 @@ final class OrderParticipantController extends Controller
         $all = $request->all();
 
         return is_array($all) ? $all : [];
+    }
+
+    /**
+     * Saga sends inventory_token in merged context after step 0; saga idem_key on the envelope root.
+     *
+     * @return array<string, mixed>
+     */
+    private function sagaParticipantData(Request $request): array
+    {
+        $data = $this->payload($request);
+        $ctx = $request->input('context');
+        if (is_array($ctx)) {
+            if (trim((string) ($data['inventory_token'] ?? '')) === '' && isset($ctx['inventory_token'])) {
+                $data['inventory_token'] = (string) $ctx['inventory_token'];
+            }
+        }
+        if (($data['saga_idem_key'] ?? 0) < 1) {
+            $root = $request->input('idem_key');
+            if (is_int($root) || is_float($root)) {
+                $data['saga_idem_key'] = (int) $root;
+            } elseif (is_string($root) && $root !== '' && ctype_digit($root)) {
+                $data['saga_idem_key'] = (int) $root;
+            }
+        }
+        if (trim((string) ($data['saga_step_idem_key'] ?? '')) === '') {
+            $sid = trim((string) $request->input('saga_instance_id', ''));
+            $step = trim((string) $request->input('step_index', ''));
+            if ($sid !== '' && $step !== '') {
+                $data['saga_step_idem_key'] = $sid.':'.$step;
+            }
+        }
+
+        return $data;
     }
 }

@@ -4,39 +4,21 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Contracts\InventoryOutboundContract;
-use App\Contracts\PaymentOutboundContract;
-use App\Enums\MallOrderStatus;
-use App\Models\MallOrder;
-use App\Models\MallPointsBalance;
-use App\Models\ProductInventory;
 use App\Models\ProductPrice;
 use App\Services\mall\CheckoutOrchestrator;
 use App\Services\mall\OrderCommandService;
+use App\Services\Transaction\SagaCoordinatorClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use Mockery;
 use RuntimeException;
 use Tests\TestCase;
 
 /**
- * 结账编排：两步支付第二步；失败时补偿（库存 release、本地积分 cancel、TCC 协调器 HTTP cancel）。
- *
  * @group checkout-orchestrator
- * @group tcc
  */
 final class CheckoutOrchestratorTest extends TestCase
 {
     use RefreshDatabase;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-        config()->set('mall_agg.checkout.use_saga_coordinators', true);
-        config()->set('api_gw.base_url', 'http://foundation.local');
-        config()->set('mall_agg.saga.flow_id', 7);
-        config()->set('mall_agg.saga.access_key', 'orch-test-ak');
-    }
 
     protected function tearDown(): void
     {
@@ -44,184 +26,13 @@ final class CheckoutOrchestratorTest extends TestCase
         parent::tearDown();
     }
 
-    /**
-     * 协调器模式下的 TCC：prepay 前已成功 begin 全局事务，失败时必须 POST cancel。
-     */
-    public function test_prepay_failure_cancels_global_tcc_and_cancels_order(): void
+    public function test_checkout_calls_saga_start_and_merges_coordinator_fields(): void
     {
-        config()->set('mall_agg.checkout.use_tcc_coordinator', true);
+        config()->set('api_gw.base_url', 'http://foundation.local');
+        config()->set('mall_agg.saga.flow_id', 7);
+        config()->set('mall_agg.saga.access_key', 'ak');
         config()->set('mall_agg.tcc.flow_id', 501);
-
-        Http::fake(array_merge(
-            $this->fakeSagaCoordinatorStartHttp(44_002, 800),
-            [
-                'http://foundation.local/api/tcc/transactions/begin' => Http::response([
-                    'errorCode' => 0,
-                    'data' => [
-                        'global_tx_id' => 'gtx-compensate-1',
-                        'idem_key' => 66001,
-                    ],
-                    'message' => '',
-                ], 200),
-                'http://foundation.local/api/tcc/tx/gtx-compensate-1/cancel' => Http::response([
-                    'errorCode' => 0,
-                    'data' => ['cancelled' => true],
-                    'message' => '',
-                ], 200),
-            ]
-        ));
-
-        ProductPrice::query()->create([
-            'pid' => 501,
-            'price' => 30,
-            'ct' => 1,
-            'ut' => 1,
-        ]);
-
-        MallPointsBalance::query()->create([
-            'uid' => 900,
-            'balance_minor' => 1000,
-            'ct' => 1,
-            'ut' => 1,
-        ]);
-
-        $inventory = Mockery::mock(InventoryOutboundContract::class);
-        $inventory->shouldReceive('reserve')->once()->andReturn(['reserve_id' => 'rev-tcc-1']);
-        $inventory->shouldReceive('release')->once()->with('rev-tcc-1');
-        $this->app->instance(InventoryOutboundContract::class, $inventory);
-        $this->app->forgetInstance(OrderCommandService::class);
-        $this->app->forgetInstance(CheckoutOrchestrator::class);
-
-        $order = app(OrderCommandService::class)->createPendingOrderForCheckout(900, [['product_id' => 501, 'quantity' => 1]]);
-        $this->assertSame(44_002, (int) $order->saga_idem_key);
-
-        $payment = Mockery::mock(PaymentOutboundContract::class);
-        $payment->shouldReceive('createPrepay')->once()->andThrow(new RuntimeException('prepay gateway down'));
-
-        $this->app->instance(PaymentOutboundContract::class, $payment);
-        $this->app->forgetInstance(CheckoutOrchestrator::class);
-
-        try {
-            app(CheckoutOrchestrator::class)->checkoutExistingOrder(900, $order, 25);
-            $this->fail('Expected RuntimeException.');
-        } catch (RuntimeException $e) {
-            $this->assertStringContainsString('prepay gateway down', $e->getMessage());
-        }
-
-        Http::assertSent(function ($request) {
-            if ($request->method() !== 'POST'
-                || $request->url() !== 'http://foundation.local/api/tcc/tx/gtx-compensate-1/cancel') {
-                return false;
-            }
-            $data = $request->data();
-
-            return ($data['cancel_reason'] ?? null) === 0;
-        });
-
-        $order = MallOrder::query()->first();
-        $this->assertNotNull($order);
-        $this->assertSame(MallOrderStatus::Cancelled, $order->status);
-    }
-
-    /**
-     * 本地积分参与者路径：Try 已落库，prepay 失败时走参与方 cancel（非协调器 cancel）。
-     */
-    public function test_prepay_failure_restores_points_for_local_tcc_try(): void
-    {
-        config()->set('mall_agg.checkout.use_tcc_coordinator', false);
-        config()->set('mall_agg.checkout.use_saga_coordinators', false);
-
-        ProductPrice::query()->create([
-            'pid' => 502,
-            'price' => 10,
-            'ct' => 1,
-            'ut' => 1,
-        ]);
-        ProductInventory::query()->create([
-            'pid' => 502,
-            'quantity' => 50,
-            'ct' => 1,
-            'ut' => 1,
-        ]);
-
-        MallPointsBalance::query()->create([
-            'uid' => 901,
-            'balance_minor' => 500,
-            'ct' => 1,
-            'ut' => 1,
-        ]);
-
-        $this->app->forgetInstance(OrderCommandService::class);
-        $order = app(OrderCommandService::class)->createPendingOrderForCheckout(901, [['product_id' => 502, 'quantity' => 1]]);
-
-        $payment = Mockery::mock(PaymentOutboundContract::class);
-        $payment->shouldReceive('createPrepay')->once()->andThrow(new RuntimeException('prepay fail'));
-
-        $this->app->instance(PaymentOutboundContract::class, $payment);
-        $this->app->forgetInstance(CheckoutOrchestrator::class);
-
-        try {
-            app(CheckoutOrchestrator::class)->checkoutExistingOrder(901, $order, 5);
-            $this->fail('Expected RuntimeException.');
-        } catch (RuntimeException $e) {
-            $this->assertStringContainsString('prepay fail', $e->getMessage());
-        }
-
-        $this->assertSame(
-            500,
-            (int) MallPointsBalance::query()->where('uid', 901)->value('balance_minor')
-        );
-
-        $order = MallOrder::query()->first();
-        $this->assertNotNull($order);
-        $this->assertSame(MallOrderStatus::Cancelled, $order->status);
-    }
-
-    /**
-     * 无积分分支：仅释放外部预留。
-     */
-    public function test_prepay_failure_releases_inventory_when_no_points(): void
-    {
-        config()->set('mall_agg.checkout.use_tcc_coordinator', false);
-
-        Http::fake($this->fakeSagaCoordinatorStartHttp(55_003, 801));
-
-        ProductPrice::query()->create([
-            'pid' => 600,
-            'price' => 5,
-            'ct' => 1,
-            'ut' => 1,
-        ]);
-
-        $inventory = Mockery::mock(InventoryOutboundContract::class);
-        $inventory->shouldReceive('reserve')->once()->andReturn(['reserve_id' => 'rev-xyz']);
-        $inventory->shouldReceive('release')->once()->with('rev-xyz');
-
-        $payment = Mockery::mock(PaymentOutboundContract::class);
-        $payment->shouldReceive('createPrepay')->once()->andThrow(new RuntimeException('prepay fail'));
-
-        $this->app->instance(InventoryOutboundContract::class, $inventory);
-        $this->app->instance(PaymentOutboundContract::class, $payment);
-        $this->app->forgetInstance(OrderCommandService::class);
-        $this->app->forgetInstance(CheckoutOrchestrator::class);
-
-        $order = app(OrderCommandService::class)->createPendingOrderForCheckout(1, [['product_id' => 600, 'quantity' => 1]]);
-
-        try {
-            app(CheckoutOrchestrator::class)->checkoutExistingOrder(1, $order, 0);
-            $this->fail('Expected RuntimeException.');
-        } catch (RuntimeException) {
-        }
-
-        $order = MallOrder::query()->first();
-        $this->assertNotNull($order);
-        $this->assertSame(MallOrderStatus::Cancelled, $order->status);
-    }
-
-    public function test_create_prepay_uses_cash_after_points(): void
-    {
-        config()->set('mall_agg.checkout.use_tcc_coordinator', false);
-        config()->set('mall_agg.checkout.use_saga_coordinators', false);
+        config()->set('mall_agg.tcc.access_key', 'tcc');
 
         ProductPrice::query()->create([
             'pid' => 88,
@@ -229,35 +40,80 @@ final class CheckoutOrchestratorTest extends TestCase
             'ct' => 1,
             'ut' => 1,
         ]);
-        ProductInventory::query()->create([
-            'pid' => 88,
-            'quantity' => 20,
-            'ct' => 1,
-            'ut' => 1,
+
+        $order = app(OrderCommandService::class)->createDraftPendingOrder(33, [['product_id' => 88, 'quantity' => 1]]);
+
+        $saga = Mockery::mock(SagaCoordinatorClient::class);
+        $saga->shouldReceive('start')->once()->withArgs(function (array $body): bool {
+            return (int) ($body['flow_id'] ?? 0) === 7
+                && (string) ($body['access_key'] ?? '') === 'ak'
+                && (int) ($body['context']['order_id'] ?? 0) > 0
+                && (int) ($body['context']['points_minor'] ?? -1) === 300;
+        })->andReturn([
+            'saga_instance_id' => '1',
+            'idem_key' => 88_001,
+            'flow_id' => 7,
+            'status' => 40,
+            'current_step_index' => 0,
+            'retry_count' => 0,
+            'last_error' => '',
+            'context' => [
+                'prepay' => ['stub' => true, 'amount_minor' => 700],
+                'global_tx_id' => 'gtx-m',
+                'idem_key' => 55_055,
+                'tcc_idem_key' => 'ord:33:x',
+            ],
+            'step_runs' => [],
         ]);
-
-        MallPointsBalance::query()->create([
-            'uid' => 33,
-            'balance_minor' => 5000,
-            'ct' => 1,
-            'ut' => 1,
-        ]);
-
-        $this->app->forgetInstance(OrderCommandService::class);
-        $order = app(OrderCommandService::class)->createPendingOrderForCheckout(33, [['product_id' => 88, 'quantity' => 1]]);
-
-        $payment = Mockery::mock(PaymentOutboundContract::class);
-        $payment->shouldReceive('createPrepay')
-            ->once()
-            ->withArgs(fn (int $oid, int $amt, int $u) => $oid === $order->id && $amt === 700 && $u === 33)
-            ->andReturn(['stub' => true]);
-
-        $this->app->instance(PaymentOutboundContract::class, $payment);
+        $this->app->instance(SagaCoordinatorClient::class, $saga);
         $this->app->forgetInstance(CheckoutOrchestrator::class);
 
         $result = app(CheckoutOrchestrator::class)->checkoutExistingOrder(33, $order, 300);
 
-        $this->assertSame(700, (int) $result['order']->cash_payable_minor);
-        $this->assertSame(300, (int) $result['order']->points_deduct_minor);
+        $this->assertSame(700, (int) $result['prepay']['amount_minor']);
+        $this->assertSame('gtx-m', $result['tid']);
+        $this->assertSame('ord:33:x', $result['points_tcc_idem_key']);
+
+        $fresh = $result['order']->fresh();
+        $this->assertNotNull($fresh);
+        $this->assertSame('gtx-m', $fresh->tid);
+        $this->assertSame(55_055, (int) $fresh->tcc_idem_key);
+    }
+
+    public function test_checkout_throws_when_saga_omits_prepay(): void
+    {
+        config()->set('api_gw.base_url', 'http://foundation.local');
+        config()->set('mall_agg.saga.flow_id', 7);
+        config()->set('mall_agg.saga.access_key', 'ak');
+        config()->set('mall_agg.tcc.flow_id', 1);
+        config()->set('mall_agg.tcc.access_key', 'tcc');
+
+        ProductPrice::query()->create([
+            'pid' => 1,
+            'price' => 10,
+            'ct' => 1,
+            'ut' => 1,
+        ]);
+        $order = app(OrderCommandService::class)->createDraftPendingOrder(1, [['product_id' => 1, 'quantity' => 1]]);
+
+        $saga = Mockery::mock(SagaCoordinatorClient::class);
+        $saga->shouldReceive('start')->once()->andReturn([
+            'saga_instance_id' => '1',
+            'idem_key' => 1,
+            'flow_id' => 1,
+            'status' => 40,
+            'context' => [
+                'global_tx_id' => 'x',
+                'idem_key' => 1,
+            ],
+            'step_runs' => [],
+        ]);
+        $this->app->instance(SagaCoordinatorClient::class, $saga);
+        $this->app->forgetInstance(CheckoutOrchestrator::class);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('prepay');
+
+        app(CheckoutOrchestrator::class)->checkoutExistingOrder(1, $order, 0);
     }
 }

@@ -85,20 +85,19 @@ final readonly class MallOverdueOrderSweepService
             return true;
         }
 
-        $tid = trim($order->tid);
-        if ($tid !== '') {
+        $coordIdem = $order->tcc_idem_key;
+        if ($coordIdem !== null && $coordIdem > 0) {
             try {
-                $this->tccClient->cancel($tid, TccCancelReason::OrderClosed);
+                $this->tccClient->cancel((string) $coordIdem, TccCancelReason::OrderClosed);
             } catch (Throwable $e) {
                 Log::warning('[mall-sweep] TCC cancel failed', ['order_id' => $order->id, 'message' => $e->getMessage()]);
             }
         }
 
         $extId = $order->ext_inventory ? trim($order->ext_id) : '';
-        $restoreLocal = ! $order->ext_inventory;
 
         try {
-            $this->orders->transitionStatus($order, MallOrderStatus::Cancelled, $restoreLocal);
+            $this->orders->transitionStatus($order, MallOrderStatus::Cancelled, false);
         } catch (Throwable $e) {
             Log::warning('[mall-sweep] transition failed', ['order_id' => $order->id, 'message' => $e->getMessage()]);
 

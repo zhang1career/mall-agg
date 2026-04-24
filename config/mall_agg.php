@@ -49,11 +49,6 @@ return [
         'partial_failure_message' => env('MALL_AGG_PARTIAL_FAILURE_MESSAGE', env('MALL_AGG_PARTIAL_FAILURE_MESSAGE', 'Partially failed, degraded by aggregator.')),
     ],
 
-    'checkout' => [
-        'use_saga_coordinators' => (bool) env('MALL_CHECKOUT_USE_SAGA_COORDINATORS', false),
-        'use_tcc_coordinator' => (bool) env('MALL_CHECKOUT_USE_TCC_COORDINATOR', false),
-    ],
-
     /*
     | POST /api/mall/payment/callback: optional shared secret via X-Payment-Callback-Token.
     */
@@ -73,9 +68,8 @@ return [
     ],
 
     /*
-    | Saga coordinator (POST /api/saga/instances). When checkout.use_saga_coordinators is true,
-    | order creation reserves inventory first, then starts a saga; idem_key is stored on order.saga_idem_key.
-    | MALL_SAGA_ACCESS_KEY + MALL_SAGA_FLOW_ID must be set; optional TCC keys are merged into saga context for downstream steps.
+    | Saga coordinator (POST /api/saga/instances). Checkout starts the flow; draft orders bind inventory in saga step 2.
+    | MALL_SAGA_ACCESS_KEY + MALL_SAGA_FLOW_ID required; MALL_TCC_* passed in saga context for TCC steps.
     */
     'saga' => [
         'timeout_seconds' => (int) env('MALL_SAGA_TIMEOUT_SECONDS', 10),

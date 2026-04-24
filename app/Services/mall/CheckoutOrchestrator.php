@@ -4,29 +4,23 @@ declare(strict_types=1);
 
 namespace App\Services\mall;
 
-use App\Contracts\InventoryOutboundContract;
-use App\Contracts\PaymentOutboundContract;
 use App\Enums\CheckoutPhase;
 use App\Enums\MallOrderStatus;
-use App\Enums\TccCancelReason;
 use App\Models\MallOrder;
-use App\Services\Transaction\TccCoordinatorClient;
+use App\Services\Transaction\SagaCoordinatorClient;
 use RuntimeException;
-use Throwable;
 
+/**
+ * Step 2: POST /api/mall/checkout — single path per docs/design/pay_swiming.puml (saga start drives inventory, order bind, TCC, prepay).
+ */
 final readonly class CheckoutOrchestrator
 {
     public function __construct(
         private OrderCommandService $orders,
-        private InventoryOutboundContract $inventory,
-        private PaymentOutboundContract $payment,
-        private MallPointsTccService $pointsTcc,
-        private TccCoordinatorClient $tccClient,
+        private SagaCoordinatorClient $sagaCoordinator,
     ) {}
 
     /**
-     * Step 2: existing pending order — points try (optional), then cash prepay for (total_price − points).
-     *
      * @return array{order: MallOrder, prepay: array<string, mixed>, points_tcc_idem_key: string|null, tid: string}
      */
     public function checkoutExistingOrder(int $uid, MallOrder $order, int $pointsMinor): array
@@ -37,115 +31,98 @@ final readonly class CheckoutOrchestrator
         if ($order->status !== MallOrderStatus::Pending) {
             throw new RuntimeException('Order is not pending checkout.');
         }
+        if ($order->checkout_phase !== CheckoutPhase::None) {
+            throw new RuntimeException('Order is not a draft; checkout already started or completed.');
+        }
         if ($pointsMinor < 0 || $pointsMinor > $order->total_price) {
             throw new RuntimeException('Invalid points_minor.');
         }
 
-        $useTccCoordinator = (bool) config('mall_agg.checkout.use_tcc_coordinator', false);
+        $flowId = (int) config('mall_agg.saga.flow_id', 0);
+        $accessKey = trim((string) config('mall_agg.saga.access_key', ''));
+        if ($flowId < 1 || $accessKey === '') {
+            throw new RuntimeException(
+                'Saga coordinator is not configured. Set MALL_SAGA_FLOW_ID and MALL_SAGA_ACCESS_KEY.'
+            );
+        }
+
+        $tccAccessKey = trim((string) config('mall_agg.tcc.access_key', ''));
         $tccFlowId = (int) config('mall_agg.tcc.flow_id', 0);
-
-        if ($order->checkout_phase === CheckoutPhase::AwaitPayment
-            && $order->points_deduct_minor === $pointsMinor) {
-            $cashPayable = $order->total_price - $pointsMinor;
-            $prepay = $this->payment->createPrepay($order->id, $cashPayable, $uid);
-
-            return [
-                'order' => $order->fresh(['items']),
-                'prepay' => $prepay,
-                'points_tcc_idem_key' => null,
-                'tid' => $order->tid,
-            ];
+        if ($tccFlowId < 1 || $tccAccessKey === '') {
+            throw new RuntimeException(
+                'TCC is not configured for saga context. Set MALL_TCC_FLOW_ID and MALL_TCC_ACCESS_KEY.'
+            );
         }
 
-        $allowedFirstPhases = [CheckoutPhase::None, CheckoutPhase::OrderCreated];
-        if (! in_array($order->checkout_phase, $allowedFirstPhases, true)) {
-            throw new RuntimeException('Order cannot be checked out in the current phase.');
+        $lines = $this->orders->linesFromOrderItems($order);
+
+        $sagaData = $this->sagaCoordinator->start([
+            'access_key' => $accessKey,
+            'flow_id' => $flowId,
+            'context' => [
+                'uid' => $uid,
+                'order_id' => $order->id,
+                'lines' => $lines,
+                'points_minor' => $pointsMinor,
+                'tcc_access_key' => $tccAccessKey,
+                'tcc_flow_id' => $tccFlowId,
+            ],
+            'step_payloads' => (object) [
+                '0' => [
+                    'uid' => $uid,
+                    'lines' => $lines,
+                ],
+                '1' => [
+                    'uid' => $uid,
+                    'order_id' => $order->id,
+                ],
+            ],
+        ]);
+
+        $ctx = $sagaData['context'] ?? null;
+        if (! is_array($ctx)) {
+            throw new RuntimeException('Saga start response missing context; check coordinator envelope and flow.');
         }
 
-        $pointsTccIdemKey = null;
-        $globalTxId = null;
-
-        try {
-            if ($pointsMinor > 0) {
-                $pointsTccIdemKey = 'ord:'.$order->id.':'.bin2hex(random_bytes(8));
-                if ($useTccCoordinator) {
-                    if ($tccFlowId < 1) {
-                        throw new RuntimeException('mall_agg.tcc.flow_id (MALL_TCC_FLOW_ID) is not configured.');
-                    }
-                    $detail = $this->tccClient->begin([
-                        'branches' => [
-                            [
-                                'biz_meta_id' => $tccFlowId,
-                                'payload' => [
-                                    'uid' => $uid,
-                                    'order_id' => $order->id,
-                                    'amount_minor' => $pointsMinor,
-                                    'tcc_idem_key' => $pointsTccIdemKey,
-                                ],
-                            ],
-                        ],
-                        'auto_confirm' => false,
-                        'context' => [
-                            'order_id' => $order->id,
-                            'uid' => $uid,
-                        ],
-                    ]);
-                    $globalTxId = (string) ($detail['global_tx_id'] ?? '');
-                    $idemKey = (int) ($detail['idem_key'] ?? 0);
-                    $order->tid = $globalTxId !== '' ? $globalTxId : '';
-                    $order->tcc_idem_key = $idemKey !== 0 ? $idemKey : null;
-                } else {
-                    $this->pointsTcc->tryFreeze($uid, $pointsMinor, $order->id, $pointsTccIdemKey);
-                }
-                $order->points_deduct_minor = $pointsMinor;
-                $order->cash_payable_minor = $order->total_price - $pointsMinor;
-                $order->checkout_phase = CheckoutPhase::PointsTryPending;
-                $order->save();
-            } else {
-                $order->points_deduct_minor = 0;
-                $order->cash_payable_minor = $order->total_price;
-                $order->save();
-            }
-
-            $prepay = $this->payment->createPrepay($order->id, $order->cash_payable_minor, $uid);
-            $order->checkout_phase = CheckoutPhase::AwaitPayment;
-            $order->save();
-
-            return [
-                'order' => $order->fresh(['items']),
-                'prepay' => $prepay,
-                'points_tcc_idem_key' => $pointsTccIdemKey,
-                'tid' => $order->tid,
-            ];
-        } catch (Throwable $e) {
-            if ($globalTxId !== null && $globalTxId !== '') {
-                try {
-                    $this->tccClient->cancel($globalTxId, TccCancelReason::Unpaid);
-                } catch (Throwable) {
-                }
-            }
-            if ($order->status === MallOrderStatus::Pending) {
-                $extId = $order->ext_inventory ? trim($order->ext_id) : '';
-                $restoreLocal = ! $order->ext_inventory;
-                try {
-                    $this->orders->transitionStatus($order, MallOrderStatus::Cancelled, $restoreLocal);
-                } catch (Throwable) {
-                }
-                if ($order->ext_inventory && $extId !== '') {
-                    try {
-                        $this->inventory->release($extId);
-                    } catch (Throwable) {
-                    }
-                }
-            }
-            if ($pointsTccIdemKey !== null && ! $useTccCoordinator) {
-                try {
-                    $this->pointsTcc->cancel($pointsTccIdemKey);
-                } catch (Throwable) {
-                }
-            }
-
-            throw $e;
+        $prepay = $ctx['prepay'] ?? null;
+        if (! is_array($prepay) || $prepay === []) {
+            throw new RuntimeException(
+                'Saga checkout context has no prepay; ensure the pay participant returns data.prepay and the flow reaches that step within the sync budget.'
+            );
         }
+
+        $order->refresh();
+
+        $globalTxId = trim((string) ($ctx['global_tx_id'] ?? ''));
+        $coordIdem = $this->intFromCoordinatorIdem($ctx['idem_key'] ?? null);
+        if ($globalTxId !== '') {
+            $order->tid = $globalTxId;
+        }
+        if ($coordIdem > 0) {
+            $order->tcc_idem_key = $coordIdem;
+        }
+        $order->save();
+
+        $pointsKey = $ctx['tcc_idem_key'] ?? null;
+        $pointsKeyStr = is_string($pointsKey) && $pointsKey !== '' ? $pointsKey : null;
+
+        return [
+            'order' => $order->fresh(['items']),
+            'prepay' => $prepay,
+            'points_tcc_idem_key' => $pointsKeyStr,
+            'tid' => trim((string) $order->tid),
+        ];
+    }
+
+    private function intFromCoordinatorIdem(mixed $raw): int
+    {
+        if (is_int($raw)) {
+            return $raw > 0 ? $raw : 0;
+        }
+        if (is_string($raw) && $raw !== '' && ctype_digit($raw)) {
+            return (int) $raw;
+        }
+
+        return 0;
     }
 }

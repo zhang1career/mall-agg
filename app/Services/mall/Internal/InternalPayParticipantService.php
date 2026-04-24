@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\mall\Internal;
 
 use App\Contracts\PaymentOutboundContract;
+use App\Enums\CheckoutPhase;
 use App\Enums\MallOrderStatus;
 use App\Services\mall\OrderCommandService;
 use Illuminate\Support\Facades\Cache;
@@ -55,8 +56,11 @@ final class InternalPayParticipantService
         }
 
         $prepay = $this->payment->createPrepay($orderId, $amount, (int) $order->uid);
-        $out = array_merge(['order_id' => $orderId], $prepay);
+        $out = ['prepay' => array_merge(['order_id' => $orderId], $prepay)];
         Cache::put($cacheKey, $out, self::CACHE_TTL_SECONDS);
+
+        $order->checkout_phase = CheckoutPhase::AwaitPayment;
+        $order->save();
 
         return $out;
     }

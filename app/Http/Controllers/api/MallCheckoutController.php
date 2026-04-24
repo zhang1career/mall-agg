@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\api;
 
 use App\Components\ApiResponse;
 use App\Enums\CheckoutPhase;
@@ -23,9 +23,10 @@ class MallCheckoutController extends Controller
 {
     public function __construct(
         private readonly UserFoundationGateway $foundationGateway,
-        private readonly OrderCommandService $orders,
-        private readonly CheckoutOrchestrator $checkout,
-    ) {}
+        private readonly OrderCommandService   $orders,
+        private readonly CheckoutOrchestrator  $checkout)
+    {
+    }
 
     public function store(Request $request): JsonResponse
     {
@@ -43,8 +44,8 @@ class MallCheckoutController extends Controller
             return response()->json(ApiResponse::error(100, $validator->errors()->first()), 422);
         }
 
-        $orderId = (int) $request->input('order_id');
-        $pointsMinor = (int) $request->input('points_minor', 0);
+        $orderId = (int)$request->input('order_id');
+        $pointsMinor = (int)$request->input('points_minor', 0);
         $uid = FoundationUser::id($user);
 
         try {
@@ -72,10 +73,11 @@ class MallCheckoutController extends Controller
 
     /**
      * @return array<string, mixed>
+     * @throws FoundationAuthRequiredException
      */
     private function requireAuthenticatedUser(Request $request): array
     {
-        $token = trim((string) $request->header('X-User-Access-Token', ''));
+        $token = trim((string)$request->header('X-User-Access-Token', ''));
         if ($token === '') {
             throw new FoundationAuthRequiredException(
                 'Authentication required. Send header: X-User-Access-Token: <access_token> (raw JWT, no Bearer prefix).'
@@ -89,7 +91,7 @@ class MallCheckoutController extends Controller
     {
         return response()->json(
             ApiResponse::error(
-                (int) config('mall_agg.foundation.unauthorized_code', 40101),
+                (int)config('mall_agg.foundation.unauthorized_code', 40101),
                 $e->getMessage()
             ),
             401
@@ -106,23 +108,23 @@ class MallCheckoutController extends Controller
         $lines = [];
         foreach ($order->items as $item) {
             $lines[] = [
-                'pid' => (int) $item->pid,
-                'quantity' => (int) $item->quantity,
-                'unit_price' => (int) $item->unit_price,
+                'pid' => $item->pid,
+                'quantity' => $item->quantity,
+                'unit_price' => $item->unit_price,
             ];
         }
 
         return [
-            'id' => (int) $order->id,
-            'uid' => (int) $order->uid,
+            'id' => $order->id,
+            'uid' => $order->uid,
             'status' => $order->status->value,
-            'total_price' => (int) $order->total_price,
-            'points_deduct_minor' => (int) $order->points_deduct_minor,
-            'cash_payable_minor' => (int) $order->cash_payable_minor,
-            'ct' => (int) $order->ct,
-            'ut' => (int) $order->ut,
+            'total_price' => $order->total_price,
+            'points_deduct_minor' => $order->points_deduct_minor,
+            'cash_payable_minor' => $order->cash_payable_minor,
+            'ct' => $order->ct,
+            'ut' => $order->ut,
             'lines' => $lines,
-            'ext_inventory' => (bool) $order->ext_inventory,
+            'ext_inventory' => $order->ext_inventory,
             'checkout_phase' => $order->checkout_phase?->value ?? CheckoutPhase::None->value,
             'tid' => $order->tid,
         ];

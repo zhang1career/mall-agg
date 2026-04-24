@@ -34,30 +34,26 @@ final readonly class SagaCoordinatorClient
     }
 
     /**
+     * GET /api/saga/instances/{instance_id} — path param is the saga instance primary key (decimal string).
+     *
      * @return array<string, mixed>
      */
-    public function detail(?int $idemKey = null, ?string $sagaInstanceId = null): array
+    public function getInstance(string $sagaInstanceId): array
     {
-        if ($idemKey === null && $sagaInstanceId === null) {
-            throw new RuntimeException('idem_key or saga_instance_id required.');
+        $id = trim($sagaInstanceId);
+        if ($id === '' || ! ctype_digit($id)) {
+            throw new RuntimeException('saga_instance_id must be a non-empty decimal string.');
         }
-        $url = $this->gateway->resolvePathSuffix('/api/saga/instances/detail');
+        $url = $this->gateway->resolvePathSuffix('/api/saga/instances/'.rawurlencode($id));
         if ($url === '') {
             throw new RuntimeException('API gateway base URL is not configured.');
         }
         $timeout = (int) config('mall_agg.saga.timeout_seconds', 10);
-        $query = [];
-        if ($idemKey !== null) {
-            $query['idem_key'] = $idemKey;
-        }
-        if ($sagaInstanceId !== null) {
-            $query['saga_instance_id'] = $sagaInstanceId;
-        }
-        $response = Http::timeout($timeout)->acceptJson()->get($url, $query);
+        $response = Http::timeout($timeout)->acceptJson()->get($url);
         if (! $response->successful()) {
-            throw new RuntimeException('Saga detail HTTP '.$response->status());
+            throw new RuntimeException('Saga instance HTTP '.$response->status());
         }
 
-        return CoordinatorEnvelope::dataOrFail($response->json(), 'saga detail');
+        return CoordinatorEnvelope::dataOrFail($response->json(), 'saga instance');
     }
 }

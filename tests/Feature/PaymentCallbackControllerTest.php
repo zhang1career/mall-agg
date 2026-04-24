@@ -7,38 +7,40 @@ namespace Tests\Feature;
 use App\Enums\CheckoutPhase;
 use App\Enums\MallOrderStatus;
 use App\Models\MallOrder;
-use App\Models\ProductInventory;
 use App\Models\ProductPrice;
 use App\Services\mall\OrderCommandService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 final class PaymentCallbackControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_callback_marks_order_paid_when_no_points_or_tcc(): void
+    public function test_callback_marks_order_paid_after_tcc_confirm(): void
     {
+        config()->set('api_gw.base_url', 'http://gw.test');
+
+        Http::fake([
+            'http://gw.test/api/tcc/tx/12345/confirm' => Http::response([
+                'errorCode' => 0,
+                'data' => [],
+                'message' => '',
+            ], 200),
+        ]);
+
         ProductPrice::query()->create([
             'pid' => 1,
             'price' => 99,
             'ct' => 1,
             'ut' => 1,
         ]);
-        ProductInventory::query()->create([
-            'pid' => 1,
-            'quantity' => 5,
-            'ct' => 1,
-            'ut' => 1,
-        ]);
-
-        config()->set('mall_agg.checkout.use_saga_coordinators', false);
 
         $order = app(OrderCommandService::class)
-            ->createPendingOrderForCheckout(7, [['product_id' => 1, 'quantity' => 1]]);
-        $this->assertSame(MallOrderStatus::Pending, $order->status);
+            ->createDraftPendingOrder(7, [['product_id' => 1, 'quantity' => 1]]);
         $order->checkout_phase = CheckoutPhase::AwaitPayment;
         $order->cash_payable_minor = (int) $order->total_price;
+        $order->tcc_idem_key = 12345;
         $order->save();
 
         $this->postJson('/api/mall/payment/callback', [
@@ -55,30 +57,35 @@ final class PaymentCallbackControllerTest extends TestCase
 
     public function test_callback_is_idempotent_when_already_paid(): void
     {
+        config()->set('api_gw.base_url', 'http://gw.test');
+        Http::fake([
+            'http://gw.test/api/tcc/tx/999/confirm' => Http::response([
+                'errorCode' => 0,
+                'data' => [],
+                'message' => '',
+            ], 200),
+        ]);
+
         ProductPrice::query()->create([
             'pid' => 2,
             'price' => 10,
             'ct' => 1,
             'ut' => 1,
         ]);
-        ProductInventory::query()->create([
-            'pid' => 2,
-            'quantity' => 1,
-            'ct' => 1,
-            'ut' => 1,
-        ]);
-        config()->set('mall_agg.checkout.use_saga_coordinators', false);
 
         $order = app(OrderCommandService::class)
-            ->createPendingOrderForCheckout(8, [['product_id' => 2, 'quantity' => 1]]);
+            ->createDraftPendingOrder(8, [['product_id' => 2, 'quantity' => 1]]);
         $order->checkout_phase = CheckoutPhase::AwaitPayment;
         $order->cash_payable_minor = (int) $order->total_price;
+        $order->tcc_idem_key = 999;
         $order->save();
 
         $this->postJson('/api/mall/payment/callback', [
             'order_id' => $order->id,
             'status' => 'paid',
         ])->assertOk();
+
+        Http::fake();
 
         $this->postJson('/api/mall/payment/callback', [
             'order_id' => $order->id,

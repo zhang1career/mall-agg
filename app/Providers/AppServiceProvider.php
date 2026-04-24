@@ -6,6 +6,7 @@ use App\Contracts\InventoryOutboundContract;
 use App\Contracts\PaymentOutboundContract;
 use App\Http\Client\OutboundHttpDebugMiddleware;
 use App\Infrastructure\ServiceDiscovery\LaravelRedisStringClient;
+use App\Logging\monolog\TodayAppLogHandler;
 use App\Queue\Connectors\DatabaseMillisConnector;
 use App\Queue\Failed\DatabaseUuidFailedJobProviderMillis;
 use App\Services\api_gw\MemoizedServiceDiscoveryUrl;
@@ -32,7 +33,10 @@ use App\Services\XxlJobRegistry;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
+use Monolog\Logger;
+use Monolog\Processor\PsrLogMessageProcessor;
 use Paganini\Capability\ProviderRegistry;
 use Paganini\ServiceDiscovery\Contracts\ServiceUriResolverInterface;
 use Paganini\ServiceDiscovery\RedisServiceUriResolver;
@@ -125,6 +129,23 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Log::extend('app_today', function ($app, array $config) {
+            $handler = new TodayAppLogHandler(
+                $config['path'],
+                (int) ($config['days'] ?? 0),
+                $this->level($config),
+                $config['bubble'] ?? true,
+                $config['permission'] ?? null,
+                $config['locking'] ?? false
+            );
+
+            return new Logger(
+                $this->parseChannel($config),
+                [$this->prepareHandler($handler, $config)],
+                $config['replace_placeholders'] ?? false ? [new PsrLogMessageProcessor] : []
+            );
+        });
+
         if (config('app.debug')) {
             Http::globalRequestMiddleware([OutboundHttpDebugMiddleware::class, 'logRequest']);
             Http::globalResponseMiddleware([OutboundHttpDebugMiddleware::class, 'logResponse']);
