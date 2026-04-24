@@ -18,6 +18,7 @@ final class XxlJobGuzzleCallbackClientAdapter implements CallbackClientInterface
     public function __construct(
         private readonly string $adminAddress,
         private readonly string $accessToken,
+        private readonly int $logDateTim,
         private readonly int $timeout = 10,
     ) {}
 
@@ -34,7 +35,7 @@ final class XxlJobGuzzleCallbackClientAdapter implements CallbackClientInterface
             $requestBody = [
                 [
                     'logId' => $logId,
-                    'logDateTim' => (int) (microtime(true) * 1000),
+                    'logDateTim' => $this->logDateTim,
                     'handleCode' => $handleCode,
                     'handleMsg' => $handleMsg,
                 ],

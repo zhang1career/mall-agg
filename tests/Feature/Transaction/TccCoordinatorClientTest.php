@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Transaction;
 
+use App\Enums\TccCancelReason;
 use App\Services\Transaction\TccCoordinatorClient;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -37,7 +38,7 @@ final class TccCoordinatorClientTest extends TestCase
         ]);
 
         $out = app(TccCoordinatorClient::class)->begin([
-            'branches' => [['branch_meta_id' => 1, 'payload' => []]],
+            'branches' => [['biz_meta_id' => 1, 'payload' => []]],
             'auto_confirm' => false,
         ]);
 
@@ -68,10 +69,10 @@ final class TccCoordinatorClientTest extends TestCase
         });
     }
 
-    public function test_confirm_posts_to_transactions_global_id_confirm(): void
+    public function test_confirm_posts_to_tx_global_id_confirm(): void
     {
         Http::fake([
-            'http://gw.test/api/tcc/transactions/gtx-z/confirm' => Http::response([
+            'http://gw.test/api/tcc/tx/gtx-z/confirm' => Http::response([
                 'errorCode' => 0,
                 'data' => ['ok' => true],
                 'message' => '',
@@ -82,24 +83,30 @@ final class TccCoordinatorClientTest extends TestCase
 
         $this->assertSame(['ok' => true], $data);
         Http::assertSent(fn ($req) => $req->method() === 'POST'
-            && $req->url() === 'http://gw.test/api/tcc/transactions/gtx-z/confirm');
+            && $req->url() === 'http://gw.test/api/tcc/tx/gtx-z/confirm');
     }
 
-    public function test_cancel_posts_to_transactions_global_id_cancel(): void
+    public function test_cancel_posts_to_tx_global_id_cancel_with_reason(): void
     {
         Http::fake([
-            'http://gw.test/api/tcc/transactions/gtx-z/cancel' => Http::response([
+            'http://gw.test/api/tcc/tx/gtx-z/cancel' => Http::response([
                 'errorCode' => 0,
                 'data' => ['cancelled' => true],
                 'message' => '',
             ], 200),
         ]);
 
-        $data = app(TccCoordinatorClient::class)->cancel('gtx-z');
+        $data = app(TccCoordinatorClient::class)->cancel('gtx-z', TccCancelReason::OrderClosed);
 
         $this->assertSame(['cancelled' => true], $data);
-        Http::assertSent(fn ($req) => $req->method() === 'POST'
-            && $req->url() === 'http://gw.test/api/tcc/transactions/gtx-z/cancel');
+        Http::assertSent(function ($req) {
+            if ($req->method() !== 'POST' || $req->url() !== 'http://gw.test/api/tcc/tx/gtx-z/cancel') {
+                return false;
+            }
+            $body = $req->data();
+
+            return ($body['cancel_reason'] ?? null) === 10;
+        });
     }
 
     public function test_begin_nonzero_error_code_maps_to_exception_via_envelope(): void

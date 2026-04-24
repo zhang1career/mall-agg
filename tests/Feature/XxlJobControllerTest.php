@@ -17,6 +17,8 @@ final class XxlJobControllerTest extends TestCase
 {
     use RefreshDatabase;
 
+    private const TRIGGER_LOG_DATE_TIME_MS = 1_700_000_000_000;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -43,7 +45,7 @@ final class XxlJobControllerTest extends TestCase
     {
         // Callback uses Guzzle directly; not intercepted by Http::fake. Admin may be unreachable in CI; sweep still runs.
         config()->set('mall_agg.orders.pending_payment_timeout_ms', 60_000);
-        config()->set('mall_agg.checkout.use_coordinators', false);
+        config()->set('mall_agg.checkout.use_saga_coordinators', false);
 
         ProductPrice::query()->create([
             'pid' => 1,
@@ -72,6 +74,7 @@ final class XxlJobControllerTest extends TestCase
                 'executorHandler' => 'closeExpiredOrders',
                 'executorParams' => '',
                 'logId' => 55_001,
+                'logDateTime' => self::TRIGGER_LOG_DATE_TIME_MS,
             ])
             ->assertOk()
             ->assertJsonPath('code', 200);
@@ -87,6 +90,20 @@ final class XxlJobControllerTest extends TestCase
                 'jobId' => 9002,
                 'executorHandler' => 'nonexistentHandler',
                 'logId' => 55_002,
+                'logDateTime' => self::TRIGGER_LOG_DATE_TIME_MS,
+            ])
+            ->assertOk()
+            ->assertJsonPath('code', 500);
+    }
+
+    public function test_run_returns_500_when_log_date_time_invalid(): void
+    {
+        $this->withHeader('XXL-JOB-ACCESS-TOKEN', 'xxl-test-token')
+            ->postJson('/api/xxl-job/run', [
+                'jobId' => 9003,
+                'executorHandler' => 'closeExpiredOrders',
+                'logId' => 55_003,
+                'logDateTime' => 0,
             ])
             ->assertOk()
             ->assertJsonPath('code', 500);

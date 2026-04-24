@@ -8,6 +8,7 @@ use App\Contracts\InventoryOutboundContract;
 use App\Contracts\PaymentOutboundContract;
 use App\Enums\CheckoutPhase;
 use App\Enums\MallOrderStatus;
+use App\Enums\TccCancelReason;
 use App\Models\MallOrder;
 use App\Services\Transaction\TccCoordinatorClient;
 use RuntimeException;
@@ -41,7 +42,7 @@ final readonly class CheckoutOrchestrator
         }
 
         $useTccCoordinator = (bool) config('mall_agg.checkout.use_tcc_coordinator', false);
-        $branchMetaPoints = (int) config('mall_agg.tcc.branch_meta_points_id', 0);
+        $tccFlowId = (int) config('mall_agg.tcc.flow_id', 0);
 
         if ($order->checkout_phase === CheckoutPhase::AwaitPayment
             && $order->points_deduct_minor === $pointsMinor) {
@@ -68,13 +69,13 @@ final readonly class CheckoutOrchestrator
             if ($pointsMinor > 0) {
                 $pointsTccIdemKey = 'ord:'.$order->id.':'.bin2hex(random_bytes(8));
                 if ($useTccCoordinator) {
-                    if ($branchMetaPoints < 1) {
-                        throw new RuntimeException('mall_agg.tcc.branch_meta_points_id is not configured.');
+                    if ($tccFlowId < 1) {
+                        throw new RuntimeException('mall_agg.tcc.flow_id (MALL_TCC_FLOW_ID) is not configured.');
                     }
                     $detail = $this->tccClient->begin([
                         'branches' => [
                             [
-                                'branch_meta_id' => $branchMetaPoints,
+                                'biz_meta_id' => $tccFlowId,
                                 'payload' => [
                                     'uid' => $uid,
                                     'order_id' => $order->id,
@@ -119,7 +120,7 @@ final readonly class CheckoutOrchestrator
         } catch (Throwable $e) {
             if ($globalTxId !== null && $globalTxId !== '') {
                 try {
-                    $this->tccClient->cancel($globalTxId);
+                    $this->tccClient->cancel($globalTxId, TccCancelReason::Unpaid);
                 } catch (Throwable) {
                 }
             }

@@ -20,7 +20,7 @@ final readonly class SagaCoordinatorClient
      */
     public function start(array $body): array
     {
-        $url = $this->gateway->resolvePathSuffix('/api/saga/instances/start');
+        $url = $this->gateway->resolvePathSuffix('/api/saga/instances');
         if ($url === '') {
             throw new RuntimeException('API gateway base URL is not configured.');
         }

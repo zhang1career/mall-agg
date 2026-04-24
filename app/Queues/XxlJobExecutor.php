@@ -25,6 +25,7 @@ final class XxlJobExecutor
         private readonly array $callable,
         private readonly mixed $param,
         private readonly int $logId,
+        private readonly int $logDateTim,
         private readonly string $filePath,
     ) {}
 
@@ -36,6 +37,7 @@ final class XxlJobExecutor
             new XxlJobGuzzleCallbackClientAdapter(
                 $resolvedAdmin->resolve(),
                 (string) config('xxl.token'),
+                $this->logDateTim,
             ),
             new XxlJobStorageFileLockAdapter,
         );

@@ -32,9 +32,10 @@ final class CheckoutOrchestratorTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config()->set('mall_agg.checkout.use_coordinators', true);
-        config()->set('mall_agg.outbound.inventory.base_url', '');
+        config()->set('mall_agg.checkout.use_saga_coordinators', true);
         config()->set('api_gw.base_url', 'http://foundation.local');
+        config()->set('mall_agg.saga.flow_id', 7);
+        config()->set('mall_agg.saga.access_key', 'orch-test-ak');
     }
 
     protected function tearDown(): void
@@ -49,23 +50,26 @@ final class CheckoutOrchestratorTest extends TestCase
     public function test_prepay_failure_cancels_global_tcc_and_cancels_order(): void
     {
         config()->set('mall_agg.checkout.use_tcc_coordinator', true);
-        config()->set('mall_agg.tcc.branch_meta_points_id', 501);
+        config()->set('mall_agg.tcc.flow_id', 501);
 
-        Http::fake([
-            'http://foundation.local/api/tcc/transactions/begin' => Http::response([
-                'errorCode' => 0,
-                'data' => [
-                    'global_tx_id' => 'gtx-compensate-1',
-                    'idem_key' => 66001,
-                ],
-                'message' => '',
-            ], 200),
-            'http://foundation.local/api/tcc/transactions/gtx-compensate-1/cancel' => Http::response([
-                'errorCode' => 0,
-                'data' => ['cancelled' => true],
-                'message' => '',
-            ], 200),
-        ]);
+        Http::fake(array_merge(
+            $this->fakeSagaCoordinatorStartHttp(44_002, 800),
+            [
+                'http://foundation.local/api/tcc/transactions/begin' => Http::response([
+                    'errorCode' => 0,
+                    'data' => [
+                        'global_tx_id' => 'gtx-compensate-1',
+                        'idem_key' => 66001,
+                    ],
+                    'message' => '',
+                ], 200),
+                'http://foundation.local/api/tcc/tx/gtx-compensate-1/cancel' => Http::response([
+                    'errorCode' => 0,
+                    'data' => ['cancelled' => true],
+                    'message' => '',
+                ], 200),
+            ]
+        ));
 
         ProductPrice::query()->create([
             'pid' => 501,
@@ -89,6 +93,7 @@ final class CheckoutOrchestratorTest extends TestCase
         $this->app->forgetInstance(CheckoutOrchestrator::class);
 
         $order = app(OrderCommandService::class)->createPendingOrderForCheckout(900, [['product_id' => 501, 'quantity' => 1]]);
+        $this->assertSame(44_002, (int) $order->saga_idem_key);
 
         $payment = Mockery::mock(PaymentOutboundContract::class);
         $payment->shouldReceive('createPrepay')->once()->andThrow(new RuntimeException('prepay gateway down'));
@@ -104,8 +109,13 @@ final class CheckoutOrchestratorTest extends TestCase
         }
 
         Http::assertSent(function ($request) {
-            return $request->method() === 'POST'
-                && $request->url() === 'http://foundation.local/api/tcc/transactions/gtx-compensate-1/cancel';
+            if ($request->method() !== 'POST'
+                || $request->url() !== 'http://foundation.local/api/tcc/tx/gtx-compensate-1/cancel') {
+                return false;
+            }
+            $data = $request->data();
+
+            return ($data['cancel_reason'] ?? null) === 0;
         });
 
         $order = MallOrder::query()->first();
@@ -119,7 +129,7 @@ final class CheckoutOrchestratorTest extends TestCase
     public function test_prepay_failure_restores_points_for_local_tcc_try(): void
     {
         config()->set('mall_agg.checkout.use_tcc_coordinator', false);
-        config()->set('mall_agg.checkout.use_coordinators', false);
+        config()->set('mall_agg.checkout.use_saga_coordinators', false);
 
         ProductPrice::query()->create([
             'pid' => 502,
@@ -174,6 +184,8 @@ final class CheckoutOrchestratorTest extends TestCase
     {
         config()->set('mall_agg.checkout.use_tcc_coordinator', false);
 
+        Http::fake($this->fakeSagaCoordinatorStartHttp(55_003, 801));
+
         ProductPrice::query()->create([
             'pid' => 600,
             'price' => 5,
@@ -209,7 +221,7 @@ final class CheckoutOrchestratorTest extends TestCase
     public function test_create_prepay_uses_cash_after_points(): void
     {
         config()->set('mall_agg.checkout.use_tcc_coordinator', false);
-        config()->set('mall_agg.checkout.use_coordinators', false);
+        config()->set('mall_agg.checkout.use_saga_coordinators', false);
 
         ProductPrice::query()->create([
             'pid' => 88,

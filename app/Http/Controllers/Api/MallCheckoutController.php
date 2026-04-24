@@ -45,15 +45,16 @@ class MallCheckoutController extends Controller
 
         $orderId = (int) $request->input('order_id');
         $pointsMinor = (int) $request->input('points_minor', 0);
+        $uid = FoundationUser::id($user);
 
         try {
-            $order = $this->orders->findForUser($orderId, FoundationUser::id($user));
+            $order = $this->orders->findForUser($orderId, $uid);
         } catch (ModelNotFoundException) {
             return response()->json(ApiResponse::error(40401, 'Order not found.'), 404);
         }
 
         try {
-            $result = $this->checkout->checkoutExistingOrder(FoundationUser::id($user), $order, $pointsMinor);
+            $result = $this->checkout->checkoutExistingOrder($uid, $order, $pointsMinor);
         } catch (RuntimeException $e) {
             return response()->json(ApiResponse::error(40001, $e->getMessage()), 422);
         }

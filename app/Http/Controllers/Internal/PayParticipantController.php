@@ -1,0 +1,72 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers\Internal;
+
+use App\Components\ApiResponse;
+use App\Http\Controllers\Controller;
+use App\Services\mall\Internal\InternalPayParticipantService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use RuntimeException;
+
+final class PayParticipantController extends Controller
+{
+    public function __construct(
+        private readonly InternalPayParticipantService $pay,
+    ) {}
+
+    public function action(Request $request): JsonResponse
+    {
+        $data = $this->payload($request);
+        $orderId = (int) ($data['order_id'] ?? 0);
+        $idem = (string) ($data['saga_step_idem_key'] ?? '');
+
+        if ($orderId < 1) {
+            return response()->json(ApiResponse::error(100, 'Invalid order_id.'), 200);
+        }
+
+        try {
+            $out = $this->pay->actionPhase($orderId, $idem);
+        } catch (RuntimeException $e) {
+            return response()->json(ApiResponse::error(100, $e->getMessage()), 200);
+        }
+
+        return response()->json(ApiResponse::ok($out));
+    }
+
+    public function compensate(Request $request): JsonResponse
+    {
+        $data = $this->payload($request);
+        $orderId = (int) ($data['order_id'] ?? 0);
+        $idem = (string) ($data['saga_step_idem_key'] ?? '');
+
+        if ($orderId < 1) {
+            return response()->json(ApiResponse::error(100, 'Invalid order_id.'), 200);
+        }
+
+        try {
+            $this->pay->compensatePhase($orderId, $idem);
+        } catch (RuntimeException $e) {
+            return response()->json(ApiResponse::error(100, $e->getMessage()), 200);
+        }
+
+        return response()->json(ApiResponse::ok(['order_id' => $orderId]));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function payload(Request $request): array
+    {
+        $payload = $request->input('payload');
+        if (is_array($payload)) {
+            return $payload;
+        }
+
+        $all = $request->all();
+
+        return is_array($all) ? $all : [];
+    }
+}

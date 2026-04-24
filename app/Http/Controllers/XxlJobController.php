@@ -39,6 +39,11 @@ final class XxlJobController
         $requestData = $request->post();
         Log::debug('[xxljob] param: request=', ['body' => $requestData]);
 
+        $logDateTim = (int) ($requestData['logDateTime'] ?? 0);
+        if ($logDateTim <= 0) {
+            return XxlResponse::fail('Invalid logDateTime');
+        }
+
         $requestJob = JobRequest::fromArray($requestData);
 
         $fileLock = new JobFileLock(new XxlJobStorageFileLockAdapter);
@@ -58,7 +63,7 @@ final class XxlJobController
         $logId = $jobData['logId'];
         $filePath = $jobData['filePath'];
 
-        XxlJobExecutor::dispatchSync($job, $params, $logId, $filePath);
+        XxlJobExecutor::dispatchSync($job, $params, $logId, $logDateTim, $filePath);
 
         return XxlResponse::success();
     }

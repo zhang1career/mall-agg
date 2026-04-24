@@ -20,4 +20,6 @@ final class StubPaymentOutboundClient implements PaymentOutboundContract
             'status' => 'stub_await_payment',
         ];
     }
+
+    public function cancelPrepay(int $orderId): void {}
 }

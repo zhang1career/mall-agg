@@ -8,6 +8,7 @@ use App\Contracts\InventoryOutboundContract;
 use App\Enums\CheckoutPhase;
 use App\Enums\MallOrderStatus;
 use App\Enums\PointsHoldState;
+use App\Enums\TccCancelReason;
 use App\Models\MallOrder;
 use App\Models\PointsFlow;
 use App\Services\Transaction\TccCoordinatorClient;
@@ -87,7 +88,7 @@ final readonly class MallOverdueOrderSweepService
         $tid = trim($order->tid);
         if ($tid !== '') {
             try {
-                $this->tccClient->cancel($tid);
+                $this->tccClient->cancel($tid, TccCancelReason::OrderClosed);
             } catch (Throwable $e) {
                 Log::warning('[mall-sweep] TCC cancel failed', ['order_id' => $order->id, 'message' => $e->getMessage()]);
             }

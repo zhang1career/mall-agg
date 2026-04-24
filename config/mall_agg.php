@@ -21,7 +21,6 @@ return [
          * Plain URLs skip Redis entirely.
          */
         'service_discovery' => [
-            'memo_ttl_seconds' => (int) env('API_GATEWAY_SD_MEMO_TTL', 60),
             'redis_connection' => env('API_GATEWAY_SD_DB_CONN', 'default'),
             'redis_key_prefix' => env('API_GATEWAY_SD_KEY_PREFIX', ''),
         ],
@@ -51,8 +50,15 @@ return [
     ],
 
     'checkout' => [
-        'use_coordinators' => (bool) env('MALL_CHECKOUT_USE_COORDINATORS', false),
+        'use_saga_coordinators' => (bool) env('MALL_CHECKOUT_USE_SAGA_COORDINATORS', false),
         'use_tcc_coordinator' => (bool) env('MALL_CHECKOUT_USE_TCC_COORDINATOR', false),
+    ],
+
+    /*
+    | POST /api/mall/payment/callback: optional shared secret via X-Payment-Callback-Token.
+    */
+    'payment' => [
+        'callback_token' => env('MALL_PAYMENT_CALLBACK_TOKEN', ''),
     ],
 
     /*
@@ -62,29 +68,30 @@ return [
         'pending_payment_timeout_ms' => (int) env('MALL_PENDING_PAYMENT_TIMEOUT_MS', 1_800_000),
     ],
 
-    'internal' => [
-        'participant_token' => env('MALL_INTERNAL_PARTICIPANT_TOKEN', ''),
-    ],
-
     'admin' => [
         'api_token' => env('MALL_ADMIN_API_TOKEN', ''),
     ],
 
+    /*
+    | Saga coordinator (POST /api/saga/instances). When checkout.use_saga_coordinators is true,
+    | order creation reserves inventory first, then starts a saga; idem_key is stored on order.saga_idem_key.
+    | MALL_SAGA_ACCESS_KEY + MALL_SAGA_FLOW_ID must be set; optional TCC keys are merged into saga context for downstream steps.
+    */
     'saga' => [
         'timeout_seconds' => (int) env('MALL_SAGA_TIMEOUT_SECONDS', 10),
-        'participant_access_key' => env('MALL_SAGA_PARTICIPANT_ACCESS_KEY', ''),
-        'checkout_flow_id' => (int) env('MALL_SAGA_CHECKOUT_FLOW_ID', 0),
+        'access_key' => env('MALL_SAGA_ACCESS_KEY', ''),
+        'flow_id' => (int) env('MALL_SAGA_FLOW_ID', 0),
     ],
 
     'tcc' => [
         'timeout_seconds' => (int) env('MALL_TCC_TIMEOUT_SECONDS', 15),
-        'branch_meta_points_id' => (int) env('MALL_TCC_BRANCH_META_POINTS_ID', 0),
+        'access_key' => env('MALL_TCC_ACCESS_KEY', ''),
+        'flow_id' => (int) env('MALL_TCC_FLOW_ID', 0),
     ],
 
-    'outbound' => [
-        'inventory' => [
-            'base_url' => env('MALL_INVENTORY_OUTBOUND_BASE_URL', ''),
-            'timeout_seconds' => (int) env('MALL_INVENTORY_OUTBOUND_TIMEOUT_SECONDS', 5),
-        ],
-    ],
+    /*
+    | Inventory external reserve/release (HTTP) is not wired yet. Code depends on
+    | InventoryOutboundContract; container binds StubInventoryOutboundClient. When a real
+    | inventory service exists, add config keys and a client implementation, then rebind.
+    */
 ];

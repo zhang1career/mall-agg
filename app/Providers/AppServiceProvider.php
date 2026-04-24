@@ -12,8 +12,12 @@ use App\Services\api_gw\MemoizedServiceDiscoveryUrl;
 use App\Services\api_gw\ResolvedApiGatewayBaseUrl;
 use App\Services\api_gw\ResolvedXxlJobAdminAddress;
 use App\Services\mall\CheckoutOrchestrator;
+use App\Services\mall\Internal\InternalInventoryParticipantService;
+use App\Services\mall\Internal\InternalOrderParticipantService;
+use App\Services\mall\Internal\InternalPayParticipantService;
 use App\Services\mall\MallCatalogService;
 use App\Services\mall\MallOverdueOrderSweepService;
+use App\Services\mall\MallPaymentCallbackService;
 use App\Services\mall\MallPointsTccService;
 use App\Services\mall\OrderCommandService;
 use App\Services\mall\ProductInventoryService;
@@ -30,13 +34,8 @@ use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\ServiceProvider;
 use Paganini\Capability\ProviderRegistry;
-use Paganini\Memo\ApcuMemoStore;
-use Paganini\Memo\ArrayMemoStore;
-use Paganini\Memo\Memoizer;
 use Paganini\ServiceDiscovery\Contracts\ServiceUriResolverInterface;
 use Paganini\ServiceDiscovery\RedisServiceUriResolver;
-
-use function function_exists;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -59,16 +58,8 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->app->singleton(MemoizedServiceDiscoveryUrl::class, function (Application $app) {
-            $ttl = (int) config('mall_agg.foundation.service_discovery.memo_ttl_seconds');
-            if ($ttl < 0) {
-                $ttl = 0;
-            }
-            $store = function_exists('apcu_fetch') ? new ApcuMemoStore('mall_agg.foundation_base') : new ArrayMemoStore;
-
             return new MemoizedServiceDiscoveryUrl(
                 $app,
-                new Memoizer($store),
-                $ttl
             );
         });
 
@@ -89,6 +80,9 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(ProductPriceService::class);
         $this->app->singleton(ProductInventoryService::class);
         $this->app->singleton(OrderCommandService::class);
+        $this->app->singleton(InternalInventoryParticipantService::class);
+        $this->app->singleton(InternalOrderParticipantService::class);
+        $this->app->singleton(InternalPayParticipantService::class);
         $this->app->singleton(MallCatalogService::class);
         $this->app->singleton(InventoryOutboundContract::class, StubInventoryOutboundClient::class);
         $this->app->singleton(PaymentOutboundContract::class, StubPaymentOutboundClient::class);
@@ -96,6 +90,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(SagaCoordinatorClient::class);
         $this->app->singleton(TccCoordinatorClient::class);
         $this->app->singleton(CheckoutOrchestrator::class);
+        $this->app->singleton(MallPaymentCallbackService::class);
         $this->app->singleton(MallOverdueOrderSweepService::class);
 
         $this->app->singleton(XxlJobRegistry::class, function () {

@@ -27,7 +27,7 @@ final class SagaCoordinatorClientTest extends TestCase
     public function test_start_posts_expected_path_and_returns_data_envelope(): void
     {
         Http::fake([
-            'http://gw.test/api/saga/instances/start' => Http::response([
+            'http://gw.test/api/saga/instances' => Http::response([
                 'errorCode' => 0,
                 'data' => [
                     'saga_instance_id' => 900,
@@ -46,7 +46,7 @@ final class SagaCoordinatorClientTest extends TestCase
 
         $this->assertSame(900, $out['saga_instance_id']);
         Http::assertSent(function ($request) {
-            return $request->url() === 'http://gw.test/api/saga/instances/start'
+            return $request->url() === 'http://gw.test/api/saga/instances'
                 && $request->method() === 'POST'
                 && ($request->data()['flow_id'] ?? null) === 7;
         });
@@ -81,7 +81,7 @@ final class SagaCoordinatorClientTest extends TestCase
     public function test_start_maps_http_500_to_runtime_exception(): void
     {
         Http::fake([
-            'http://gw.test/api/saga/instances/start' => Http::response('oops', 500),
+            'http://gw.test/api/saga/instances' => Http::response('oops', 500),
         ]);
 
         $this->expectException(RuntimeException::class);

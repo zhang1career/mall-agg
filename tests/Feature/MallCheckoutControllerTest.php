@@ -26,19 +26,24 @@ class MallCheckoutControllerTest extends TestCase
         config()->set('api_gw.base_url', 'http://foundation.local');
         config()->set('mall_agg.foundation.base_url', 'http://foundation.local');
         config()->set('mall_agg.foundation.me_endpoint', '/api/user/me');
-        config()->set('mall_agg.checkout.use_coordinators', true);
+        config()->set('mall_agg.checkout.use_saga_coordinators', true);
         config()->set('mall_agg.checkout.use_tcc_coordinator', false);
+        config()->set('mall_agg.saga.flow_id', 7);
+        config()->set('mall_agg.saga.access_key', 'checkout-test-ak');
     }
 
     private function fakeUserMe(int $userId): void
     {
-        Http::fake([
-            'http://foundation.local/api/user/me' => Http::response([
-                'errorCode' => 0,
-                'data' => ['id' => $userId, 'username' => 'buyer'],
-                'message' => '',
-            ], 200),
-        ]);
+        Http::fake(array_merge(
+            $this->fakeSagaCoordinatorStartHttp(),
+            [
+                'http://foundation.local/api/user/me' => Http::response([
+                    'errorCode' => 0,
+                    'data' => ['id' => $userId, 'username' => 'buyer'],
+                    'message' => '',
+                ], 200),
+            ]
+        ));
     }
 
     public function test_checkout_requires_auth(): void
@@ -99,7 +104,7 @@ class MallCheckoutControllerTest extends TestCase
 
     public function test_checkout_works_when_coordinator_disabled_two_step(): void
     {
-        config()->set('mall_agg.checkout.use_coordinators', false);
+        config()->set('mall_agg.checkout.use_saga_coordinators', false);
 
         $this->fakeUserMe(1);
 
@@ -189,23 +194,26 @@ class MallCheckoutControllerTest extends TestCase
     public function test_checkout_with_tcc_coordinator_calls_begin_and_sets_order_tid(): void
     {
         config()->set('mall_agg.checkout.use_tcc_coordinator', true);
-        config()->set('mall_agg.tcc.branch_meta_points_id', 501);
+        config()->set('mall_agg.tcc.flow_id', 501);
 
-        Http::fake([
-            'http://foundation.local/api/user/me' => Http::response([
-                'errorCode' => 0,
-                'data' => ['id' => 55, 'username' => 'u'],
-                'message' => '',
-            ], 200),
-            'http://foundation.local/api/tcc/transactions/begin' => Http::response([
-                'errorCode' => 0,
-                'data' => [
-                    'global_tx_id' => 'gtx-coord-99',
-                    'idem_key' => 77_001,
-                ],
-                'message' => '',
-            ], 200),
-        ]);
+        Http::fake(array_merge(
+            $this->fakeSagaCoordinatorStartHttp(),
+            [
+                'http://foundation.local/api/user/me' => Http::response([
+                    'errorCode' => 0,
+                    'data' => ['id' => 55, 'username' => 'u'],
+                    'message' => '',
+                ], 200),
+                'http://foundation.local/api/tcc/transactions/begin' => Http::response([
+                    'errorCode' => 0,
+                    'data' => [
+                        'global_tx_id' => 'gtx-coord-99',
+                        'idem_key' => 77_001,
+                    ],
+                    'message' => '',
+                ], 200),
+            ]
+        ));
 
         ProductPrice::query()->create([
             'pid' => 8,
@@ -241,6 +249,7 @@ class MallCheckoutControllerTest extends TestCase
         $this->assertIsString($idem);
         $this->assertStringStartsWith('ord:', (string) $idem);
 
+        $orderId = (int) $response->json('data.order.id');
         $order = MallOrder::query()->find($orderId);
         $this->assertNotNull($order);
         $this->assertSame('gtx-coord-99', $order->tid);
@@ -257,8 +266,8 @@ class MallCheckoutControllerTest extends TestCase
             $branches = $body['branches'] ?? null;
 
             return is_array($branches)
-                && isset($branches[0]['branch_meta_id'])
-                && (int) $branches[0]['branch_meta_id'] === 501
+                && isset($branches[0]['biz_meta_id'])
+                && (int) $branches[0]['biz_meta_id'] === 501
                 && isset($branches[0]['payload']['tcc_idem_key']);
         });
     }

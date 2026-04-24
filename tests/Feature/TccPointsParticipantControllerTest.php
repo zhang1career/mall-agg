@@ -15,20 +15,14 @@ class TccPointsParticipantControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-        config()->set('mall_agg.internal.participant_token', 'test-internal-token');
-    }
-
     /**
      * @param  array<string, mixed>  $payload
      */
     private function postTry(array $payload): TestResponse
     {
-        return $this->postJson('/internal/tcc/points/try', [
+        return $this->postJson('/internal/points/try', [
             'payload' => $payload,
-        ], ['X-Internal-Token' => 'test-internal-token']);
+        ]);
     }
 
     public function test_try_confirm_cancel_round_trip(): void
@@ -40,36 +34,25 @@ class TccPointsParticipantControllerTest extends TestCase
             'ut' => 1,
         ]);
 
-        $try = $this->postJson('/internal/tcc/points/try', [
+        $try = $this->postJson('/internal/points/try', [
             'payload' => [
                 'uid' => 9,
                 'amount_minor' => 100,
                 'order_id' => 1,
                 'tcc_idem_key' => 'idem-1',
             ],
-        ], [
-            'X-Internal-Token' => 'test-internal-token',
         ]);
 
         $try->assertOk()->assertJsonPath('errorCode', 0);
         $this->assertSame(400, (int) MallPointsBalance::query()->where('uid', 9)->value('balance_minor'));
 
-        $this->postJson('/internal/tcc/points/confirm', [
+        $this->postJson('/internal/points/confirm', [
             'tcc_idem_key' => 'idem-1',
-        ], [
-            'X-Internal-Token' => 'test-internal-token',
         ])->assertOk()->assertJsonPath('errorCode', 0);
 
         $hold = PointsFlow::query()->where('tcc_idem_key', 'idem-1')->first();
         $this->assertNotNull($hold);
         $this->assertSame(PointsHoldState::Confirmed, $hold->state);
-    }
-
-    public function test_rejects_without_token(): void
-    {
-        $this->postJson('/internal/tcc/points/try', [
-            'payload' => ['uid' => 1, 'amount_minor' => 1, 'tcc_idem_key' => 'x'],
-        ])->assertForbidden();
     }
 
     public function test_try_cancel_restores_balance_and_marks_rolled_back(): void
@@ -89,9 +72,9 @@ class TccPointsParticipantControllerTest extends TestCase
 
         $this->assertSame(220, (int) MallPointsBalance::query()->where('uid', 11)->value('balance_minor'));
 
-        $this->postJson('/internal/tcc/points/cancel', [
+        $this->postJson('/internal/points/cancel', [
             'tcc_idem_key' => 'idem-cancel-1',
-        ], ['X-Internal-Token' => 'test-internal-token'])
+        ])
             ->assertOk()
             ->assertJsonPath('errorCode', 0);
 
@@ -153,9 +136,7 @@ class TccPointsParticipantControllerTest extends TestCase
 
     public function test_confirm_rejects_missing_tcc_idem_key(): void
     {
-        $this->postJson('/internal/tcc/points/confirm', [], [
-            'X-Internal-Token' => 'test-internal-token',
-        ])
+        $this->postJson('/internal/points/confirm', [])
             ->assertOk()
             ->assertJsonPath('errorCode', 100)
             ->assertJsonPath('message', 'Missing tcc_idem_key.');

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Transaction;
 
+use App\Enums\TccCancelReason;
 use App\Services\api_gw\ResolvedApiGatewayBaseUrl;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -66,7 +67,7 @@ final readonly class TccCoordinatorClient
      */
     public function confirm(string $globalTxId): array
     {
-        $url = $this->gateway->resolvePathSuffix('/api/tcc/transactions/'.$globalTxId.'/confirm');
+        $url = $this->gateway->resolvePathSuffix('/api/tcc/tx/'.$globalTxId.'/confirm');
         if ($url === '') {
             throw new RuntimeException('API gateway base URL is not configured.');
         }
@@ -82,14 +83,16 @@ final readonly class TccCoordinatorClient
     /**
      * @return array<string, mixed>
      */
-    public function cancel(string $globalTxId): array
+    public function cancel(string $globalTxId, TccCancelReason $reason = TccCancelReason::Unpaid): array
     {
-        $url = $this->gateway->resolvePathSuffix('/api/tcc/transactions/'.$globalTxId.'/cancel');
+        $url = $this->gateway->resolvePathSuffix('/api/tcc/tx/'.$globalTxId.'/cancel');
         if ($url === '') {
             throw new RuntimeException('API gateway base URL is not configured.');
         }
         $timeout = (int) config('mall_agg.tcc.timeout_seconds', 15);
-        $response = Http::timeout($timeout)->acceptJson()->post($url, []);
+        $response = Http::timeout($timeout)->acceptJson()->asJson()->post($url, [
+            'cancel_reason' => $reason->value,
+        ]);
         if (! $response->successful()) {
             throw new RuntimeException('TCC cancel HTTP '.$response->status());
         }

@@ -30,6 +30,5 @@
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
-        <env name="MALL_INTERNAL_PARTICIPANT_TOKEN" value="test-internal-token"/>
     </php>
 </phpunit>

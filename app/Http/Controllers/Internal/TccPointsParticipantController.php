@@ -12,7 +12,7 @@ use Illuminate\Http\Request;
 use RuntimeException;
 
 /**
- * TCC participant endpoints for mall-agg–hosted points; invoked by app_tcc coordinator.
+ * Points TCC participant (Try / Confirm / Cancel); routed as `POST /internal/points/*`.
  */
 final class TccPointsParticipantController extends Controller
 {

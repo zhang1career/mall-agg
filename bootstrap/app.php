@@ -3,7 +3,6 @@
 use App\Components\ApiResponse;
 use App\Http\Middleware\LogApiHttpErrors;
 use App\Http\Middleware\VerifyAdminApiToken;
-use App\Http\Middleware\VerifyInternalParticipantToken;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -21,7 +20,7 @@ $app = Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
         then: function () {
-            Route::middleware(['api', VerifyInternalParticipantToken::class])
+            Route::middleware(['api'])
                 ->prefix('internal')
                 ->group(base_path('routes/internal.php'));
         },
@@ -29,7 +28,6 @@ $app = Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->appendToGroup('api', LogApiHttpErrors::class);
         $middleware->alias([
-            'internal.participant' => VerifyInternalParticipantToken::class,
             'admin.api' => VerifyAdminApiToken::class,
         ]);
     })
