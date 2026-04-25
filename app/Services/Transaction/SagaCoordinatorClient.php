@@ -12,6 +12,7 @@ final readonly class SagaCoordinatorClient
 {
     public function __construct(
         private ResolvedApiGatewayBaseUrl $gateway,
+        private SagaStartRequestIdProvider $sagaStartRequestId,
     ) {}
 
     /**
@@ -25,7 +26,12 @@ final readonly class SagaCoordinatorClient
             throw new RuntimeException('API gateway base URL is not configured.');
         }
         $timeout = (int) config('mall_agg.saga.timeout_seconds', 10);
-        $response = Http::timeout($timeout)->acceptJson()->asJson()->post($url, $body);
+        $req = Http::timeout($timeout)->acceptJson()->asJson();
+        $rid = $this->sagaStartRequestId->requestIdForSagaStart();
+        if ($rid !== null && $rid !== '') {
+            $req = $req->withHeaders(['X-Request-Id' => $rid]);
+        }
+        $response = $req->post($url, $body);
         if (! $response->successful()) {
             throw new RuntimeException('Saga start HTTP '.$response->status());
         }
