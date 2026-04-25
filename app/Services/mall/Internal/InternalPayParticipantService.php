@@ -31,11 +31,29 @@ final class InternalPayParticipantService
      */
     public function actionPhase(int $orderId, string $sagaStepIdemKey): array
     {
-        if (trim($sagaStepIdemKey) === '') {
-            throw new RuntimeException('saga_step_idem_key is required.');
+        return $this->runPrepayTry($orderId, $sagaStepIdemKey, 'saga_step_idem_key');
+    }
+
+    /**
+     * TCC Try branch {@see PayParticipantController::try} uses coordinator {@code idempotency_key}.
+     *
+     * @return array<string, mixed>
+     */
+    public function tryPhase(int $orderId, string $idempotencyKey): array
+    {
+        return $this->runPrepayTry($orderId, $idempotencyKey, 'idempotency_key');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function runPrepayTry(int $orderId, string $idemRaw, string $idemFieldLabel): array
+    {
+        $idem = trim($idemRaw);
+        if ($idem === '') {
+            throw new RuntimeException($idemFieldLabel.' is required.');
         }
 
-        $idem = trim($sagaStepIdemKey);
         $cacheKey = self::TRY_CACHE.$idem;
         $cached = Cache::get($cacheKey);
         if (is_array($cached)) {

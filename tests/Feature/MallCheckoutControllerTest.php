@@ -31,11 +31,16 @@ class MallCheckoutControllerTest extends TestCase
     private function fakeUserMe(int $userId, array $contextOverrides = []): void
     {
         $ctx = array_merge([
-            'prepay' => ['stub' => true, 'amount_minor' => 50, 'status' => 'stub_await_payment'],
             'global_tx_id' => 'gtx-fe',
             'idem_key' => 77_002,
             'tcc_idem_key' => null,
         ], $contextOverrides);
+        unset($ctx['prepay']);
+
+        $prepayPartial = ['stub' => true, 'amount_minor' => 50, 'status' => 'stub_await_payment'];
+        if (isset($contextOverrides['prepay']) && is_array($contextOverrides['prepay'])) {
+            $prepayPartial = $contextOverrides['prepay'];
+        }
 
         $sagaData = [
             'saga_instance_id' => '1',
@@ -46,6 +51,20 @@ class MallCheckoutControllerTest extends TestCase
             'retry_count' => 0,
             'last_error' => '',
             'context' => $ctx,
+            'need_confirm' => [
+                [
+                    'response' => [
+                        'branches' => [
+                            'prepay' => [
+                                'data' => [
+                                    'errorCode' => 0,
+                                    'data' => ['prepay' => $prepayPartial],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
             'step_runs' => [],
         ];
 

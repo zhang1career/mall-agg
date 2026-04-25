@@ -154,4 +154,34 @@ final class InternalSagaParticipantControllersTest extends TestCase
         $order->refresh();
         $this->assertSame(CheckoutPhase::AwaitPayment, $order->checkout_phase);
     }
+
+    public function test_pay_try_matches_action_for_tcc_envelope(): void
+    {
+        ProductPrice::query()->create([
+            'pid' => 6,
+            'price' => 200,
+            'ct' => 1,
+            'ut' => 1,
+        ]);
+
+        $order = app(OrderCommandService::class)->createDraftPendingOrder(4, [['product_id' => 6, 'quantity' => 1]]);
+        $order->cash_payable_minor = (int) $order->total_price;
+        $order->save();
+
+        $idem = 'tcc-branch-'.bin2hex(random_bytes(4));
+        $this->postJson('/internal/pay/try', [
+            'idempotency_key' => $idem,
+            'payload' => ['order_id' => $order->id],
+        ])
+            ->assertOk()
+            ->assertJsonPath('errorCode', 0)
+            ->assertJsonPath('data.prepay.status', 'stub_await_payment');
+
+        $this->postJson('/internal/pay/try', [
+            'idempotency_key' => $idem,
+            'payload' => ['order_id' => $order->id],
+        ])
+            ->assertOk()
+            ->assertJsonPath('errorCode', 0);
+    }
 }

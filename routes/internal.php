@@ -19,4 +19,5 @@ Route::post('points/confirm', [TccPointsParticipantController::class, 'confirm']
 Route::post('points/cancel', [TccPointsParticipantController::class, 'cancel']);
 
 Route::post('pay/action', [PayParticipantController::class, 'action']);
+Route::post('pay/try', [PayParticipantController::class, 'try']);
 Route::post('pay/compensate', [PayParticipantController::class, 'compensate']);

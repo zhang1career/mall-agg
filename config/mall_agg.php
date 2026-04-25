@@ -68,19 +68,35 @@ return [
     ],
 
     /*
-    | Saga coordinator (POST /api/saga/instances). Checkout starts the flow; draft orders bind inventory in saga step 2.
-    | MALL_SAGA_ACCESS_KEY + MALL_SAGA_FLOW_ID required; MALL_TCC_* passed in saga context for TCC steps.
+    | Saga coordinator (POST /api/saga/instances). Checkout starts the flow; step_payloads use checkout_steps keys.
+    | MALL_SAGA_* required; MALL_TCC_ACCESS_KEY as root tcc_access_key; MALL_TCC_FLOW_ID as pay step biz_id.
+    | need_confirm must carry prepay (pay step is_need_confirm); TccBranchMeta.code must match tcc.checkout_branches.
     */
     'saga' => [
         'timeout_seconds' => (int) env('MALL_SAGA_TIMEOUT_SECONDS', 10),
         'access_key' => env('MALL_SAGA_ACCESS_KEY', ''),
         'flow_id' => (int) env('MALL_SAGA_FLOW_ID', 0),
+        /*
+        | Checkout flow step_payloads keys (match SagaFlowStep.step_code in coordinator).
+        */
+        'checkout_steps' => [
+            'inventory' => env('MALL_SAGA_CHECKOUT_STEP_INVENTORY', 'inventory'),
+            'order' => env('MALL_SAGA_CHECKOUT_STEP_ORDER', 'order'),
+            'pay' => env('MALL_SAGA_CHECKOUT_STEP_PAY', 'pay'),
+        ],
     ],
 
     'tcc' => [
         'timeout_seconds' => (int) env('MALL_TCC_TIMEOUT_SECONDS', 15),
         'access_key' => env('MALL_TCC_ACCESS_KEY', ''),
         'flow_id' => (int) env('MALL_TCC_FLOW_ID', 0),
+        /*
+        | TCC biz (MALL_TCC_FLOW_ID) branch codes for checkout pay step — must match DB TccBranchMeta.code for that biz.
+        */
+        'checkout_branches' => [
+            'try_points' => env('MALL_TCC_BRANCH_TRY_POINTS', 'try_points'),
+            'prepay' => env('MALL_TCC_BRANCH_PREPAY', 'prepay'),
+        ],
     ],
 
     /*

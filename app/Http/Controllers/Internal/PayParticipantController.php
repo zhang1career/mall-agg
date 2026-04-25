@@ -36,6 +36,28 @@ final class PayParticipantController extends Controller
         return response()->json(ApiResponse::ok($out));
     }
 
+    /**
+     * TCC coordinator Try for branch {@code prepay} (same prepay body as {@see action}, different idempotency field).
+     */
+    public function try(Request $request): JsonResponse
+    {
+        $data = $this->payTryPayload($request);
+        $orderId = (int) ($data['order_id'] ?? 0);
+        $idem = trim((string) $request->input('idempotency_key', ''));
+
+        if ($orderId < 1) {
+            return response()->json(ApiResponse::error(100, 'Invalid order_id.'), 200);
+        }
+
+        try {
+            $out = $this->pay->tryPhase($orderId, $idem);
+        } catch (RuntimeException $e) {
+            return response()->json(ApiResponse::error(100, $e->getMessage()), 200);
+        }
+
+        return response()->json(ApiResponse::ok($out));
+    }
+
     public function compensate(Request $request): JsonResponse
     {
         $data = $this->sagaParticipantData($request);
@@ -86,6 +108,20 @@ final class PayParticipantController extends Controller
             if ($sid !== '' && $step !== '') {
                 $data['saga_step_idem_key'] = $sid.':'.$step;
             }
+        }
+
+        return $data;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function payTryPayload(Request $request): array
+    {
+        $data = $this->payload($request);
+        $ctx = $request->input('context');
+        if (is_array($ctx) && ($data['order_id'] ?? 0) < 1 && isset($ctx['order_id'])) {
+            $data['order_id'] = (int) $ctx['order_id'];
         }
 
         return $data;

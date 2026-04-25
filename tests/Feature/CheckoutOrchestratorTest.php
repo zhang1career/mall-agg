@@ -45,10 +45,23 @@ final class CheckoutOrchestratorTest extends TestCase
 
         $saga = Mockery::mock(SagaCoordinatorClient::class);
         $saga->shouldReceive('start')->once()->withArgs(function (array $body): bool {
-            return (int) ($body['flow_id'] ?? 0) === 7
-                && (string) ($body['access_key'] ?? '') === 'ak'
-                && (int) ($body['context']['order_id'] ?? 0) > 0
-                && (int) ($body['context']['points_minor'] ?? -1) === 300;
+            if ((int) ($body['flow_id'] ?? 0) !== 7
+                || (string) ($body['access_key'] ?? '') !== 'ak'
+                || (string) ($body['tcc_access_key'] ?? '') !== 'tcc'
+                || (int) ($body['context']['order_id'] ?? 0) < 1
+                || (int) ($body['context']['points_minor'] ?? -1) !== 300) {
+                return false;
+            }
+            $sp = $body['step_payloads'] ?? null;
+            if (! is_object($sp) && ! is_array($sp)) {
+                return false;
+            }
+            $pay = is_array($sp) ? ($sp['pay'] ?? null) : ($sp->pay ?? null);
+
+            return is_array($pay)
+                && (int) ($pay['biz_id'] ?? 0) === 501
+                && ($pay['auto_confirm'] ?? null) === false
+                && isset($pay['branches'][0]['branch_code'], $pay['branches'][1]['branch_code']);
         })->andReturn([
             'saga_instance_id' => '1',
             'idem_key' => 88_001,
@@ -58,10 +71,25 @@ final class CheckoutOrchestratorTest extends TestCase
             'retry_count' => 0,
             'last_error' => '',
             'context' => [
-                'prepay' => ['stub' => true, 'amount_minor' => 700],
                 'global_tx_id' => 'gtx-m',
                 'idem_key' => 55_055,
                 'tcc_idem_key' => 'ord:33:x',
+            ],
+            'need_confirm' => [
+                [
+                    'response' => [
+                        'branches' => [
+                            'prepay' => [
+                                'data' => [
+                                    'errorCode' => 0,
+                                    'data' => [
+                                        'prepay' => ['stub' => true, 'amount_minor' => 700],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
             ],
             'step_runs' => [],
         ]);
@@ -71,6 +99,7 @@ final class CheckoutOrchestratorTest extends TestCase
         $result = app(CheckoutOrchestrator::class)->checkoutExistingOrder(33, $order, 300);
 
         $this->assertSame(700, (int) $result['prepay']['amount_minor']);
+        $this->assertSame('1', (string) $result['prepay']['schema_version']);
         $this->assertSame('gtx-m', $result['tid']);
         $this->assertSame('ord:33:x', $result['points_tcc_idem_key']);
 
@@ -112,7 +141,7 @@ final class CheckoutOrchestratorTest extends TestCase
         $this->app->forgetInstance(CheckoutOrchestrator::class);
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('prepay');
+        $this->expectExceptionMessage('need_confirm');
 
         app(CheckoutOrchestrator::class)->checkoutExistingOrder(1, $order, 0);
     }

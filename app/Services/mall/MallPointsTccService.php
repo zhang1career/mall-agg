@@ -90,7 +90,7 @@ final class MallPointsTccService
         DB::transaction(function () use ($tccIdemKey): void {
             $hold = PointsFlow::query()->where('tcc_idem_key', $tccIdemKey)->lockForUpdate()->first();
             if ($hold === null) {
-                throw new RuntimeException('Points hold not found.');
+                return;
             }
             if ($hold->state === PointsHoldState::Confirmed) {
                 return;

@@ -11,7 +11,7 @@ use App\Services\Transaction\SagaCoordinatorClient;
 use RuntimeException;
 
 /**
- * Step 2: POST /api/mall/checkout — single path per docs/design/pay_swiming.puml (saga start drives inventory, order bind, TCC, prepay).
+ * Step 2: POST /api/mall/checkout — saga start drives inventory, order bind, TCC (points + prepay), then assembles client prepay.
  */
 final readonly class CheckoutOrchestrator
 {
@@ -50,8 +50,22 @@ final readonly class CheckoutOrchestrator
         $tccFlowId = (int) config('mall_agg.tcc.flow_id', 0);
         if ($tccFlowId < 1 || $tccAccessKey === '') {
             throw new RuntimeException(
-                'TCC is not configured for saga context. Set MALL_TCC_FLOW_ID and MALL_TCC_ACCESS_KEY.'
+                'TCC is not configured for checkout. Set MALL_TCC_FLOW_ID and MALL_TCC_ACCESS_KEY.'
             );
+        }
+
+        $stepCodes = config('mall_agg.saga.checkout_steps');
+        $branchCodes = config('mall_agg.tcc.checkout_branches');
+        if (! is_array($stepCodes) || ! is_array($branchCodes)) {
+            throw new RuntimeException('mall_agg saga.checkout_steps / tcc.checkout_branches must be configured.');
+        }
+        $inventoryStep = (string) ($stepCodes['inventory'] ?? '');
+        $orderStep = (string) ($stepCodes['order'] ?? '');
+        $payStep = (string) ($stepCodes['pay'] ?? '');
+        $tryPointsBranch = (string) ($branchCodes['try_points'] ?? '');
+        $prepayBranch = (string) ($branchCodes['prepay'] ?? '');
+        if ($inventoryStep === '' || $orderStep === '' || $payStep === '' || $tryPointsBranch === '' || $prepayBranch === '') {
+            throw new RuntimeException('Checkout step or TCC branch code resolved empty; check mall_agg config.');
         }
 
         $lines = $this->orders->linesFromOrderItems($order);
@@ -59,22 +73,41 @@ final readonly class CheckoutOrchestrator
         $sagaData = $this->sagaCoordinator->start([
             'access_key' => $accessKey,
             'flow_id' => $flowId,
+            'tcc_access_key' => $tccAccessKey,
             'context' => [
                 'uid' => $uid,
                 'order_id' => $order->id,
                 'lines' => $lines,
                 'points_minor' => $pointsMinor,
-                'tcc_access_key' => $tccAccessKey,
-                'tcc_flow_id' => $tccFlowId,
             ],
             'step_payloads' => (object) [
-                '0' => [
+                $inventoryStep => [
                     'uid' => $uid,
                     'lines' => $lines,
                 ],
-                '1' => [
+                $orderStep => [
                     'uid' => $uid,
                     'order_id' => $order->id,
+                ],
+                $payStep => [
+                    'biz_id' => $tccFlowId,
+                    'auto_confirm' => false,
+                    'branches' => [
+                        [
+                            'branch_code' => $tryPointsBranch,
+                            'payload' => [
+                                'uid' => $uid,
+                                'order_id' => $order->id,
+                                'amount_minor' => $pointsMinor,
+                            ],
+                        ],
+                        [
+                            'branch_code' => $prepayBranch,
+                            'payload' => [
+                                'order_id' => $order->id,
+                            ],
+                        ],
+                    ],
                 ],
             ],
         ]);
@@ -84,10 +117,17 @@ final readonly class CheckoutOrchestrator
             throw new RuntimeException('Saga start response missing context; check coordinator envelope and flow.');
         }
 
-        $prepay = $ctx['prepay'] ?? null;
-        if (! is_array($prepay) || $prepay === []) {
+        $needConfirm = $sagaData['need_confirm'] ?? null;
+        if (! is_array($needConfirm) || $needConfirm === []) {
             throw new RuntimeException(
-                'Saga checkout context has no prepay; ensure the pay participant returns data.prepay and the flow reaches that step within the sync budget.'
+                'Saga checkout response must include non-empty need_confirm (pay step is_need_confirm).'
+            );
+        }
+        $partial = $this->prepayPartialFromNeedConfirm($needConfirm, $prepayBranch);
+        if ($partial === null || $partial === []) {
+            throw new RuntimeException(
+                'Saga checkout need_confirm does not contain prepay; check TCC branch "'
+                .$prepayBranch.'" participant returns data.prepay.'
             );
         }
 
@@ -106,12 +146,92 @@ final readonly class CheckoutOrchestrator
         $pointsKey = $ctx['tcc_idem_key'] ?? null;
         $pointsKeyStr = is_string($pointsKey) && $pointsKey !== '' ? $pointsKey : null;
 
+        $prepay = $this->assembleCheckoutPrepay($partial, $order, $uid);
+
         return [
             'order' => $order->fresh(['items']),
             'prepay' => $prepay,
             'points_tcc_idem_key' => $pointsKeyStr,
             'tid' => trim((string) $order->tid),
         ];
+    }
+
+    /**
+     * @param  list<mixed>  $needConfirm
+     * @return array<string, mixed>|null
+     */
+    private function prepayPartialFromNeedConfirm(array $needConfirm, string $prepayBranchCode): ?array
+    {
+        foreach (array_reverse($needConfirm) as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            $response = $item['response'] ?? null;
+            if (! is_array($response)) {
+                continue;
+            }
+            $extracted = $this->extractPrepayFromCoordinatorResponse($response, $prepayBranchCode);
+            if ($extracted !== null && $extracted !== []) {
+                return $extracted;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function extractPrepayFromCoordinatorResponse(array $response, string $prepayBranchCode): ?array
+    {
+        if (isset($response['prepay']) && is_array($response['prepay'])) {
+            return $response['prepay'];
+        }
+        $branches = $response['branches'] ?? null;
+        if (! is_array($branches)) {
+            return null;
+        }
+        $entry = $branches[$prepayBranchCode] ?? null;
+        if (! is_array($entry)) {
+            return null;
+        }
+        $participantJson = $entry['data'] ?? null;
+        if (! is_array($participantJson)) {
+            return null;
+        }
+        $biz = $participantJson['data'] ?? null;
+        if (is_array($biz) && isset($biz['prepay']) && is_array($biz['prepay'])) {
+            return $biz['prepay'];
+        }
+        if (isset($participantJson['prepay']) && is_array($participantJson['prepay'])) {
+            return $participantJson['prepay'];
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $partial
+     * @return array<string, mixed>
+     */
+    private function assembleCheckoutPrepay(array $partial, MallOrder $order, int $uid): array
+    {
+        $order->refresh();
+        $cash = (int) $order->cash_payable_minor;
+        if ($cash < 1) {
+            $cash = max(0, (int) $order->total_price - (int) $order->points_deduct_minor);
+        }
+
+        $envelope = [
+            'schema_version' => '1',
+            'pay_channel' => 'stub',
+            'order_id' => (int) $order->id,
+            'uid' => $uid,
+            'amount_minor' => $cash,
+            'invoke_payment' => 'placeholder',
+        ];
+
+        return array_merge($envelope, $partial);
     }
 
     private function intFromCoordinatorIdem(mixed $raw): int

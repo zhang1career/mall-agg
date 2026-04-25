@@ -14,7 +14,7 @@ mall_agg   <-     sf_saga   : POST /internal/order/action
 sf_saga     ->    sf_tcc    : POST /api/tcc/tx
 mall_agg   <-     sf_tcc    : POST /internal/points/try
 mall_agg   <-     sf_tcc    : POST /internal/pay/try
-mall_agg    ->    3rd_pay   : (调起支付，占位)
+mall_agg    ->    3rd_pay   : (调起预支付，占位)
 user       <->    3rd_pay   : (支付)
 mall_agg   <-     3rd_pay   : POST /api/mall/payment/callback
 mall_agg    ->    sf_tcc    : POST /api/tcc/tx/{idem_key}/confirm

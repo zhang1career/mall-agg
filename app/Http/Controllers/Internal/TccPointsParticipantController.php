@@ -29,14 +29,16 @@ final class TccPointsParticipantController extends Controller
         $amountMinor = (int) ($data['amount_minor'] ?? 0);
         $orderId = isset($data['order_id']) ? (int) $data['order_id'] : null;
         $tccIdemKey = $this->tccIdemKeyFromPayload($data);
-        if ($uid < 1 || $amountMinor < 1 || $tccIdemKey === '') {
+        if ($uid < 1 || $amountMinor < 0 || $tccIdemKey === '') {
             return response()->json(ApiResponse::error(100, 'Invalid TCC try payload.'), 200);
         }
 
-        try {
-            $this->points->tryFreeze($uid, $amountMinor, $orderId, $tccIdemKey);
-        } catch (RuntimeException $e) {
-            return response()->json(ApiResponse::error(100, $e->getMessage()), 200);
+        if ($amountMinor > 0) {
+            try {
+                $this->points->tryFreeze($uid, $amountMinor, $orderId, $tccIdemKey);
+            } catch (RuntimeException $e) {
+                return response()->json(ApiResponse::error(100, $e->getMessage()), 200);
+            }
         }
 
         if ($orderId !== null && $orderId > 0) {
