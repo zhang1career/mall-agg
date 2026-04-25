@@ -9,7 +9,7 @@ use Monolog\Processor\PsrLogMessageProcessor;
 $defaultFileLogFormatter = [
     'formatter' => LineFormatter::class,
     'formatter_with' => [
-        'format' => "[%datetime%] %channel%.%level_name%: %message% %context% %extra%\n",
+        'format' => "[%datetime%] %channel%.%level_name% [%extra.x_request_id%] %message% %context%\n",
         'dateFormat' => 'Y-m-d H:i:s',
         'allowInlineLineBreaks' => false,
         'ignoreEmptyContextAndExtra' => true,

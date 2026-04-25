@@ -7,6 +7,7 @@ use App\Contracts\PaymentOutboundContract;
 use App\Http\Client\OutboundHttpDebugMiddleware;
 use App\Infrastructure\ServiceDiscovery\LaravelRedisStringClient;
 use App\Logging\monolog\TodayAppLogHandler;
+use App\Logging\Processors\XRequestIdLogProcessor;
 use App\Queue\Connectors\DatabaseMillisConnector;
 use App\Queue\Failed\DatabaseUuidFailedJobProviderMillis;
 use App\Services\api_gw\MemoizedServiceDiscoveryUrl;
@@ -155,10 +156,16 @@ class AppServiceProvider extends ServiceProvider
                 $config['locking'] ?? false
             );
 
+            $processors = [];
+            if ($config['replace_placeholders'] ?? false) {
+                $processors[] = new PsrLogMessageProcessor;
+            }
+            $processors[] = new XRequestIdLogProcessor;
+
             return new Logger(
                 $this->parseChannel($config),
                 [$this->prepareHandler($handler, $config)],
-                $config['replace_placeholders'] ?? false ? [new PsrLogMessageProcessor] : []
+                $processors
             );
         });
 
