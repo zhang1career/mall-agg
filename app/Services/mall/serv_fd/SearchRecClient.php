@@ -75,9 +75,9 @@ final readonly class SearchRecClient
         $response = Http::timeout($this->timeoutSeconds)
             ->acceptJson()
             ->asJson()
-            ->post($this->baseUrl . '/index/upsert', $payload);
+            ->post($this->baseUrl . '/index', $payload);
 
-        $this->unwrapEnvelope($response, 'searchrec index upsert');
+        $this->unwrapEnvelope($response, 'searchrec index');
     }
 
     /**

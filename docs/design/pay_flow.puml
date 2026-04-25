@@ -1,0 +1,146 @@
+@startuml pay_two_step_happy_path
+title 两步支付 — 主成功路径（突出 HTTP/API 与参与方）\n手机端经网关调用 **/api/mall-agg/***，本服务路由为 **/api/mall/***
+
+skinparam ActivityBackgroundColor #FEFEFE
+skinparam ActivityBorderColor #333333
+skinparam ArrowColor #333333
+skinparam PartitionBorderColor #999999
+
+legend right
+  | 联合支付 | createPrepay 金额 = total_price − points_minor |
+  | 订单落库 | 持久化抵扣额、应付现金（payable）便于对账 |
+  | 幂等策略 | 第二步允许换新 prepay（若支付渠道允许）；回调按 order_id 防重复入账 |
+  | 闭环 | 仅以**支付渠道异步回调**落账；与 TCC/Saga **Confirm** 先后顺序见项目文档写死 |
+  | 超时关单 | **XXL-Job** 调本服务 **POST /api/xxl-job/run**（同步执行 handler）关单释资源 |
+endlegend
+
+|#E3F2FD|手机端|
+start
+:用户确认下单;
+:POST **/api/mall-agg/orders**\nBody: lines[]\nHeader: X-User-Access-Token;
+
+|#E8F5E9|mall_agg|
+:鉴权、校验;
+:统一占资源 + 建单\n（库存/预留由编排调用 Saga 侧参与者）;
+:持久化 total_price、抵扣额、应付现金等;
+:响应 **201** data.order（含 id、status、金额明细）;
+
+|手机端|
+:进入收银台;
+:POST **/api/mall-agg/checkout**\nBody: order_id, optional points_minor\nHeader: X-User-Access-Token;
+
+|mall_agg|
+:校验订单归属与状态（如 Pending）;
+:读取订单标价与 points_minor;
+
+partition "可选：积分（TCC）" {
+  if (points_minor > 0 ?) then (是)
+    if (MALL_CHECKOUT_USE_TCC_COORDINATOR ?) then (是)
+      |#FCE4EC|TCC_协调器|
+      :API：**begin** 全局事务\n（积分分支 Try，payload 含 order_id、tcc_idem_key）;
+      |mall_agg|
+      :写回 tid / tcc_idem_key;
+    else (否)
+      :本机积分 **Try**（内部 API / 参与者）;
+    endif
+  endif
+}
+
+|mall_agg|
+:调用支付出站：**createPrepay**\namount = **total_price − points_minor**;
+
+|#E1F5FE|第三方支付|
+:渠道预下单;
+:返回 **prepay**（SDK/H5 参数）;
+
+|mall_agg|
+:checkout_phase → AwaitPayment 等;
+:响应 **201** data.prepay, order, tid, points_tcc_idem_key;
+
+|手机端|
+:用 **prepay** 调起微信/支付宝等 **SDK**;
+
+|第三方支付|
+:用户在钱包完成支付;
+:**异步回调** → mall_agg\n（如 POST **/api/mall-agg/payment/callback**，以 OpenAPI 为准）;
+
+|mall_agg|
+:验签、幂等、更新订单为 Paid;
+:按**文档固定顺序**执行 **TCC Confirm** / **Saga 确认** 等收尾;
+
+|手机端|
+:轮询 **GET /api/mall-agg/orders/{id}**\n确认 status = Paid;
+stop
+
+@enduml
+
+
+@startuml pay_saga_inventory_try
+title Saga 视角 — 库存/预留（Try / 补偿与 mall_agg 的调用关系）\n（具体 URL 以 Inventory 出站实现为准；此处强调 API 边界）
+
+|#E8F5E9|mall_agg|
+start
+:业务需要预留库存时;
+:出站调用 **库存服务 Reserve API**\n(uid, lines 或 order 上下文);
+
+|#FFF8E1|Saga_库存参与者|
+:Try：预留成功 → reserve_id;
+:响应 reserve_id;
+
+|mall_agg|
+:建单或更新 ext_id / 预留关联;
+
+floating note right
+  失败或关单时：mall_agg 出站 **Release**\n与下图 **checkout 失败补偿** 一致
+end note
+
+stop
+@enduml
+
+
+@startuml pay_checkout_failure_compensation
+title checkout 失败 — 补偿顺序（跨参与方 API）\n（与 CheckoutOrchestrator catch 语义对齐）
+
+|#E8F5E9|mall_agg|
+start
+
+if (已得 global_tx_id ?) then (是)
+  |#FCE4EC|TCC_协调器|
+  :API：**cancel**(global_tx_id);
+endif
+
+|mall_agg|
+if (订单已创建 ?) then (是)
+  :订单 **Cancelled**\n（不恢复本地库存若 ext_inventory）;
+endif
+
+if (本地积分 Try 且非 TCC 协调器 ?) then (是)
+  :积分参与者 **cancel**(idem_key);
+endif
+
+if (reserve_id 有效 ?) then (是)
+  |#FFF8E1|Saga_库存参与者|
+  :API：**release**(reserve_id);
+endif
+
+|mall_agg|
+:向外抛原始异常\n→ 手机端 4xx/422;
+stop
+
+@enduml
+
+
+@startuml pay_overdue_close_worker
+title 待支付超时 — XXL-Job 调 mall-agg **/api/xxl-job/run**\n（同步执行，handler 如 closeExpiredOrders）
+
+|#F3E5F5|XXL-Job_Admin|
+start
+:调度触发;
+:HTTP POST /api/xxl-job/run\n(executorHandler = closeExpiredOrders);
+
+|#E8F5E9|mall_agg|
+:关单 + 释放预留/库存\n+ TCC/积分补偿;
+
+stop
+
+@enduml

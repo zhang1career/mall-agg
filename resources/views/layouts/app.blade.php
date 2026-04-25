@@ -22,7 +22,7 @@
           integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
     <link rel="stylesheet" href="{{ asset('css/mall-admin.css') }}">
 </head>
-<body class="min-h-screen text-sm">
+<body class="mall-admin min-h-screen text-sm">
 <div class="flex h-screen overflow-hidden">
     <aside id="console-sidebar"
            class="relative bg-sidebar text-white flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out"
@@ -54,6 +54,17 @@
                                   d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
                         </svg>
                         <span class="sidebar-text ml-3 whitespace-nowrap">Orders</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ route('admin.points.index') }}"
+                       class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-700 transition-colors sidebar-link {{ request()->routeIs('admin.points.*') ? 'bg-gray-700' : '' }}"
+                       title="Points">
+                        <svg class="w-5 h-5 flex-shrink-0 sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span class="sidebar-text ml-3 whitespace-nowrap">Points</span>
                     </a>
                 </li>
             </ul>
@@ -113,10 +124,54 @@
     </main>
 </div>
 
+{{-- Global confirm delete (form action set via data-mall-delete-url on open button) --}}
+<div class="modal fade" id="mallModalDelete" tabindex="-1" aria-labelledby="mallModalDeleteLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="mallModalDeleteLabel">Confirm delete</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0" id="mall-delete-message">Delete this record?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form id="mall-form-delete" method="post" class="d-inline">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
         crossorigin="anonymous"></script>
 <script src="{{ asset('js/mall-admin.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var delForm = document.getElementById('mall-form-delete');
+        var delModalEl = document.getElementById('mallModalDelete');
+        if (!delForm || !delModalEl) {
+            return;
+        }
+        var delMsg = document.getElementById('mall-delete-message');
+        var delModal = bootstrap.Modal.getOrCreateInstance(delModalEl);
+        document.querySelectorAll('[data-mall-delete-url]').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                delForm.action = btn.getAttribute('data-mall-delete-url');
+                if (delMsg) {
+                    delMsg.textContent = btn.getAttribute('data-mall-delete-message') || 'Delete this record?';
+                }
+                delModal.show();
+            });
+        });
+    });
+</script>
 @stack('scripts')
 </body>
 </html>

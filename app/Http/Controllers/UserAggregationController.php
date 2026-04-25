@@ -20,11 +20,11 @@ class UserAggregationController extends Controller
         UserAggregationExecutor $executor,
         UserDegradePolicy $degradePolicy
     ): JsonResponse {
-        $token = $request->bearerToken();
-        if ($token === null || trim($token) === '') {
+        $token = trim((string) $request->header('X-User-Access-Token', ''));
+        if ($token === '') {
             return response()->json(ApiResponse::error(
                 (int) config('mall_agg.foundation.unauthorized_code', 40101),
-                'Authorization required. Call POST /api/user/login first, store access_token on the client, then call this endpoint with header: Authorization: Bearer <access_token> (single space after Bearer).'
+                'Authentication required. Call POST /api/user/login first, store access_token on the client, then send header: X-User-Access-Token: <access_token> (raw JWT, no Bearer prefix).'
             ), 401);
         }
 
@@ -47,7 +47,7 @@ class UserAggregationController extends Controller
             'query' => $request->query(),
             'headers' => $request->headers->all(),
             'trace_id' => $request->header('X-Trace-Id'),
-            'bearer_token' => $request->bearerToken(),
+            'user_access_token' => $token,
         ];
 
         $result = $executor->execute(

@@ -105,6 +105,24 @@ class AdminProductController extends Controller
             ->with('status', 'Product created.');
     }
 
+    public function show(int $product): View
+    {
+        try {
+            $row = $this->cms->find($product);
+        } catch (DownstreamServiceException $e) {
+            abort(404, $e->getMessage());
+        }
+
+        $priceMap = $this->prices->getPriceByProductIds([$product]);
+        $qtyMap = $this->inventory->getQuantityByProductIds([$product]);
+
+        return view('admin.products.show', [
+            'product' => $row,
+            'price' => $priceMap[$product] ?? null,
+            'quantity' => $qtyMap[$product] ?? null,
+        ]);
+    }
+
     public function edit(int $product): View
     {
         try {

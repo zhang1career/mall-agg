@@ -40,6 +40,7 @@ trait LogsHandledApiRequests
             'new_password',
             'refresh_token',
             'access_token',
+            'x-user-access-token',
             'token',
             'authorization',
             'code',

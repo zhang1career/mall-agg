@@ -1,14 +1,8 @@
-/**
- * Mall admin console: layout chrome + theme (aligned with service_foundation console).
- * Light: 护眼浅绿背景；暗色：html.theme-dark（由 mall-admin.js 切换）
- */
+/* Mall admin: Bootstrap dark via data-bs-theme; extra rules for sidebar + Tailwind utilities. */
 
-body {
-    background-color: #dcf5e0;
-}
-
-html.theme-dark body {
-    background-color: #111827;
+body.mall-admin {
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
 }
 
 #console-sidebar {
@@ -45,7 +39,6 @@ html.theme-dark body {
     padding-right: 0.5rem;
 }
 
-/* Toggle switch (same as service_foundation console) */
 .console-toggle-wrap {
     position: relative;
     display: inline-block;
@@ -101,131 +94,165 @@ html.theme-dark body {
     border-color: #fff;
 }
 
-/* Top bar + main (Tailwind utility companions) */
-html.theme-dark .theme-header {
+html[data-bs-theme="dark"] {
+    color-scheme: dark;
+}
+
+html[data-bs-theme="dark"] .theme-header {
     background: #1f2937;
     border-bottom: 1px solid #374151;
 }
 
-html.theme-dark .theme-title {
+html[data-bs-theme="dark"] .theme-title {
     color: #f3f4f6;
 }
 
-html.theme-dark .theme-toggle-icon {
+html[data-bs-theme="dark"] .theme-toggle-icon {
     color: #9ca3af;
 }
 
-html.theme-dark main.mall-admin-main {
+html[data-bs-theme="dark"] main.mall-admin-main {
     background: #111827;
 }
 
-html.theme-dark #console-sidebar {
+html[data-bs-theme="dark"] #console-sidebar {
     background: #0f172a;
 }
 
-html.theme-dark #console-sidebar .border-gray-700 {
+html[data-bs-theme="dark"] #console-sidebar .border-gray-700 {
     border-color: #334155;
 }
 
-html.theme-dark #console-sidebar a:hover {
+html[data-bs-theme="dark"] #console-sidebar a:hover {
     background: #1e293b;
 }
 
-html.theme-dark #console-sidebar a.bg-gray-700,
-html.theme-dark #console-sidebar .sidebar-link.bg-gray-700 {
+html[data-bs-theme="dark"] #console-sidebar a.bg-gray-700,
+html[data-bs-theme="dark"] #console-sidebar .sidebar-link.bg-gray-700 {
     background: #334155;
 }
 
-/* Bootstrap surfaces in dark theme */
-html.theme-dark .bg-white {
+/* Tailwind .bg-white on admin pages */
+html[data-bs-theme="dark"] .bg-white {
     background-color: #1f2937 !important;
+    color: var(--bs-body-color);
+}
+
+.mall-console-card {
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.5rem;
+    background: var(--bs-body-bg);
+}
+
+html[data-bs-theme="dark"] .mall-console-card {
+    background: #1f2937;
+    border-color: #374151;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.mall-console-card-header {
+    background: var(--bs-tertiary-bg);
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+html[data-bs-theme="dark"] .mall-console-card-header {
+    background: #111827;
+    color: #f3f4f6;
+}
+
+.mall-console-card-footer {
+    background: var(--bs-tertiary-bg);
+    border-top: 1px solid var(--bs-border-color);
+}
+
+html[data-bs-theme="dark"] .mall-console-card-footer {
+    background: #111827;
+}
+
+.mall-data-table thead th {
+    background: var(--bs-tertiary-bg);
+    color: var(--bs-emphasis-color);
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+html[data-bs-theme="dark"] .mall-data-table thead th {
+    background: #374151;
+    color: #f3f4f6;
+}
+
+.mall-inline-code {
+    font-size: 0.8em;
+    padding: 0.1rem 0.35rem;
+    border-radius: 0.25rem;
+    background: var(--bs-tertiary-bg);
+}
+
+html[data-bs-theme="dark"] .mall-inline-code {
+    background: #374151;
     color: #e5e7eb;
 }
 
-html.theme-dark .text-muted {
+.mall-badge-soft {
+    background: #e0e7ff;
+    color: #3730a3;
+    font-weight: 500;
+}
+
+html[data-bs-theme="dark"] .mall-badge-soft {
+    background: #312e81;
+    color: #c7d2fe;
+}
+
+html[data-bs-theme="dark"] .text-gray-800 {
+    color: #f3f4f6 !important;
+}
+
+html[data-bs-theme="dark"] .text-gray-700 {
+    color: #e5e7eb !important;
+}
+
+html[data-bs-theme="dark"] .text-gray-600 {
+    color: #d1d5db !important;
+}
+
+html[data-bs-theme="dark"] .text-gray-500 {
     color: #9ca3af !important;
 }
 
-html.theme-dark .table {
-    color: #e5e7eb;
-    --bs-table-bg: transparent;
-    --bs-table-striped-bg: rgba(55, 65, 81, 0.5);
-    --bs-table-hover-bg: rgba(55, 65, 81, 0.65);
-    --bs-border-color: #374151;
+html[data-bs-theme="dark"] .bg-gray-100 {
+    background-color: #111827 !important;
 }
 
-html.theme-dark .table > :not(caption) > * > * {
-    border-bottom-color: #374151;
+html[data-bs-theme="dark"] .border-gray-200 {
+    border-color: #4b5563 !important;
 }
 
-html.theme-dark .table thead th {
-    background: #374151;
-    color: #f3f4f6;
+.mall-list-toolbar h2,
+.mall-subnav {
+    color: var(--bs-emphasis-color, inherit);
 }
 
-html.theme-dark .form-control,
-html.theme-dark .form-select {
-    background-color: #374151;
-    border-color: #4b5563;
-    color: #f3f4f6;
+.mall-icon-btn {
+    line-height: 0;
+    border: none;
+    background: transparent;
+    color: var(--bs-body-color);
+    cursor: pointer;
 }
 
-html.theme-dark .form-label {
-    color: #d1d5db;
+.mall-icon-btn:hover {
+    background: var(--bs-tertiary-bg);
+    color: var(--bs-emphasis-color);
 }
 
-html.theme-dark .btn-outline-secondary {
-    border-color: #6b7280;
-    color: #e5e7eb;
-}
-
-html.theme-dark .btn-outline-secondary:hover {
-    background: #4b5563;
-    color: #fff;
-}
-
-html.theme-dark .btn-outline-danger {
-    border-color: #b91c1c;
+.mall-icon-btn.text-danger:hover {
+    background: rgba(185, 28, 28, 0.25);
     color: #fecaca;
 }
 
-html.theme-dark .btn-outline-danger:hover {
-    background: #991b1b;
-    color: #fef2f2;
-}
-
-html.theme-dark .btn-link {
-    color: #93c5fd;
-}
-
-html.theme-dark .pagination .page-link {
-    background: #374151;
-    border-color: #4b5563;
-    color: #e5e7eb;
-}
-
-html.theme-dark .pagination .page-item.active .page-link {
-    background: #3b82f6;
-    border-color: #3b82f6;
-}
-
-html.theme-dark .pagination .page-item.disabled .page-link {
-    background: #1f2937;
-    color: #6b7280;
-}
-
-html.theme-dark .alert-success {
-    background: #065f46;
-    border-color: #047857;
-    color: #a7f3d0;
-}
-
-html.theme-dark .alert-danger {
-    background: #7f1d1d;
-    border-color: #991b1b;
-    color: #fecaca;
-}
-
-html.theme-dark h2.h5 {
-    color: #f3f4f6;
+.mall-icon-svg {
+    display: block;
 }

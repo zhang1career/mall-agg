@@ -1,8 +1,102 @@
-/**
- * Theme + sidebar: behavior aligned with service_foundation app_console static console/js/main.js
- */
 (function () {
     'use strict';
+
+    /** In-memory cache: dict code -> list of { k, v } (aligned with GET /api/mall/dict). */
+    var mallDictCache = {};
+
+    function mallDictLabel(code, rawValue) {
+        var list = mallDictCache[code];
+        var s = String(rawValue);
+        if (!list) {
+            return s;
+        }
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].v === s) {
+                return list[i].k;
+            }
+        }
+        return s;
+    }
+
+    function mallDictMerge(data) {
+        if (!data || typeof data !== 'object') {
+            return;
+        }
+        Object.keys(data).forEach(function (code) {
+            mallDictCache[code] = data[code];
+        });
+    }
+
+    function mallDictFetch(codes, done) {
+        var missing = codes.filter(function (c) {
+            return c && !mallDictCache[c];
+        });
+        if (missing.length === 0) {
+            if (typeof done === 'function') {
+                done();
+            }
+            return;
+        }
+        var url = '/api/mall/dict?codes=' + encodeURIComponent(missing.join(','));
+        fetch(url, { credentials: 'same-origin' })
+            .then(function (r) {
+                return r.json();
+            })
+            .then(function (body) {
+                if (body && body.errorCode === 0 && body.data) {
+                    mallDictMerge(body.data);
+                }
+            })
+            .catch(function () {})
+            .finally(function () {
+                if (typeof done === 'function') {
+                    done();
+                }
+            });
+    }
+
+    function mallDictEnsure(codes, done) {
+        var need = codes.filter(Boolean);
+        mallDictFetch(need, done);
+    }
+
+    function mallDictCollectCodes(root) {
+        root = root || document;
+        var set = {};
+        root.querySelectorAll('[data-mall-dict-code]').forEach(function (el) {
+            var c = el.getAttribute('data-mall-dict-code');
+            if (c) {
+                set[c] = true;
+            }
+        });
+        return Object.keys(set);
+    }
+
+    function mallDictApply(root) {
+        root = root || document;
+        root.querySelectorAll('[data-mall-dict-code]').forEach(function (el) {
+            var code = el.getAttribute('data-mall-dict-code');
+            var v = el.getAttribute('data-mall-dict-value');
+            if (!code) {
+                return;
+            }
+            el.textContent = mallDictLabel(code, v);
+        });
+    }
+
+    function mallDictInit(root) {
+        var codes = mallDictCollectCodes(root || document);
+        if (codes.length === 0) {
+            return;
+        }
+        mallDictFetch(codes, function () {
+            mallDictApply(root || document);
+        });
+    }
+
+    window.mallDictLabel = mallDictLabel;
+    window.mallDictEnsure = mallDictEnsure;
+    window.mallDictInit = mallDictInit;
 
     var THEME_KEY = 'mall-admin-theme';
     var DARK = 'dark';
@@ -27,7 +121,7 @@
 
     function applyTheme(theme) {
         var isDark = theme === DARK;
-        document.documentElement.classList.toggle('theme-dark', isDark);
+        document.documentElement.setAttribute('data-bs-theme', isDark ? 'dark' : 'light');
         var cb = document.getElementById('theme-toggle');
         if (cb) {
             cb.checked = !isDark;
@@ -175,5 +269,6 @@
     document.addEventListener('DOMContentLoaded', function () {
         initTheme();
         initSidebar();
+        mallDictInit(document);
     });
 })();

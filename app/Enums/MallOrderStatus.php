@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Contracts\HasDictionaryLabel;
 use ValueError;
 
-enum MallOrderStatus: int
+enum MallOrderStatus: int implements HasDictionaryLabel
 {
     case Pending = 0;
     case Paid = 1;

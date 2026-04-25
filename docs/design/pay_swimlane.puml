@@ -1,0 +1,22 @@
+@startuml
+autonumber
+
+actor   user
+control mall_agg
+control sf_saga
+control sf_tcc
+control 3rd_pay
+
+user        ->    mall_agg  : POST /api/mall/checkout
+mall_agg    ->    sf_saga   : POST /api/saga/instances
+mall_agg   <-     sf_saga   : POST /internal/inventory/action
+mall_agg   <-     sf_saga   : POST /internal/order/action
+sf_saga     ->    sf_tcc    : POST /api/tcc/tx
+mall_agg   <-     sf_tcc    : POST /internal/points/try
+mall_agg   <-     sf_tcc    : POST /internal/pay/try
+mall_agg    ->    3rd_pay   : (调起预支付，占位)
+user       <->    3rd_pay   : (支付)
+mall_agg   <-     3rd_pay   : POST /api/mall/payment/callback
+mall_agg    ->    sf_tcc    : POST /api/tcc/tx/{idem_key}/confirm
+
+@enduml

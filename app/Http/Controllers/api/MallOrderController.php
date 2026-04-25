@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\api;
 
 use App\Components\ApiResponse;
+use App\Enums\CheckoutPhase;
 use App\Enums\MallOrderStatus;
 use App\Exceptions\FoundationAuthRequiredException;
 use App\Http\Controllers\Controller;
@@ -23,8 +24,9 @@ class MallOrderController extends Controller
 {
     public function __construct(
         private readonly UserFoundationGateway $foundationGateway,
-        private readonly OrderCommandService $orders,
-    ) {}
+        private readonly OrderCommandService   $orders)
+    {
+    }
 
     public function store(Request $request): JsonResponse
     {
@@ -46,17 +48,17 @@ class MallOrderController extends Controller
         /** @var list<array{product_id: int, quantity: int}> $lines */
         $lines = [];
         foreach ($request->input('lines', []) as $line) {
-            if (! is_array($line)) {
+            if (!is_array($line)) {
                 continue;
             }
             $lines[] = [
-                'product_id' => (int) $line['product_id'],
-                'quantity' => (int) $line['quantity'],
+                'product_id' => (int)$line['product_id'],
+                'quantity' => (int)$line['quantity'],
             ];
         }
 
         try {
-            $order = $this->orders->createOrder(FoundationUser::id($user), $lines);
+            $order = $this->orders->createDraftPendingOrder(FoundationUser::id($user), $lines);
         } catch (RuntimeException $e) {
             return response()->json(ApiResponse::error(40001, $e->getMessage()), 422);
         }
@@ -82,7 +84,7 @@ class MallOrderController extends Controller
         }
 
         $raw = $request->input('status');
-        if (! is_string($raw) && ! is_int($raw)) {
+        if (!is_string($raw) && !is_int($raw)) {
             return response()->json(ApiResponse::error(100, 'Invalid status.'), 422);
         }
 
@@ -114,7 +116,7 @@ class MallOrderController extends Controller
             return $this->unauthorizedResponse($e);
         }
 
-        $perPage = min(50, max(1, (int) $request->query('per_page', 15)));
+        $perPage = min(50, max(1, (int)$request->query('per_page', 15)));
 
         $paginator = $this->orders->paginateForUser(FoundationUser::id($user), $perPage);
         $items = [];
@@ -156,13 +158,14 @@ class MallOrderController extends Controller
 
     /**
      * @return array<string, mixed>
+     * @throws FoundationAuthRequiredException
      */
     private function requireAuthenticatedUser(Request $request): array
     {
-        $token = $request->bearerToken();
-        if ($token === null || trim($token) === '') {
+        $token = trim((string)$request->header('X-User-Access-Token', ''));
+        if ($token === '') {
             throw new FoundationAuthRequiredException(
-                'Authorization required. Send Authorization: Bearer <access_token>.'
+                'Authentication required. Send header: X-User-Access-Token: <access_token> (raw JWT, no Bearer prefix).'
             );
         }
 
@@ -173,7 +176,7 @@ class MallOrderController extends Controller
     {
         return response()->json(
             ApiResponse::error(
-                (int) config('mall_agg.foundation.unauthorized_code', 40101),
+                (int)config('mall_agg.foundation.unauthorized_code', 40101),
                 $e->getMessage()
             ),
             401
@@ -190,20 +193,26 @@ class MallOrderController extends Controller
         $lines = [];
         foreach ($order->items as $item) {
             $lines[] = [
-                'pid' => (int) $item->pid,
-                'quantity' => (int) $item->quantity,
-                'unit_price' => (int) $item->unit_price,
+                'pid' => $item->pid,
+                'quantity' => $item->quantity,
+                'unit_price' => $item->unit_price,
             ];
         }
 
         return [
-            'id' => (int) $order->id,
-            'uid' => (int) $order->uid,
+            'id' => $order->id,
+            'uid' => $order->uid,
             'status' => $order->status->value,
-            'total_price' => (int) $order->total_price,
-            'ct' => (int) $order->ct,
-            'ut' => (int) $order->ut,
+            'total_price' => $order->total_price,
+            'points_deduct_minor' => $order->points_deduct_minor,
+            'cash_payable_minor' => $order->cash_payable_minor,
+            'ct' => $order->ct,
+            'ut' => $order->ut,
             'lines' => $lines,
+            'ext_inventory' => $order->ext_inventory,
+            'ext_id' => $order->ext_id,
+            'checkout_phase' => $order->checkout_phase?->value ?? CheckoutPhase::None->value,
+            'tid' => $order->tid,
         ];
     }
 
@@ -213,12 +222,12 @@ class MallOrderController extends Controller
     private function serializeOrderSummary(MallOrder $order): array
     {
         return [
-            'id' => (int) $order->id,
-            'uid' => (int) $order->uid,
+            'id' => $order->id,
+            'uid' => $order->uid,
             'status' => $order->status->value,
-            'total_price' => (int) $order->total_price,
-            'ct' => (int) $order->ct,
-            'ut' => (int) $order->ut,
+            'total_price' => $order->total_price,
+            'ct' => $order->ct,
+            'ut' => $order->ut,
         ];
     }
 }
