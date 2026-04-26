@@ -23,10 +23,8 @@ class MallCheckoutController extends Controller
 {
     public function __construct(
         private readonly UserFoundationGateway $foundationGateway,
-        private readonly OrderCommandService   $orders,
-        private readonly CheckoutOrchestrator  $checkout)
-    {
-    }
+        private readonly OrderCommandService $orders,
+        private readonly CheckoutOrchestrator $checkout) {}
 
     public function store(Request $request): JsonResponse
     {
@@ -44,8 +42,8 @@ class MallCheckoutController extends Controller
             return response()->json(ApiResponse::error(100, $validator->errors()->first()), 422);
         }
 
-        $orderId = (int)$request->input('order_id');
-        $pointsMinor = (int)$request->input('points_minor', 0);
+        $orderId = (int) $request->input('order_id');
+        $pointsMinor = (int) $request->input('points_minor', 0);
         $uid = FoundationUser::id($user);
 
         try {
@@ -54,8 +52,13 @@ class MallCheckoutController extends Controller
             return response()->json(ApiResponse::error(40401, 'Order not found.'), 404);
         }
 
+        $xRequestId = trim((string) $request->header('X-Request-Id', ''));
+        if ($xRequestId === '') {
+            $xRequestId = '0';
+        }
+
         try {
-            $result = $this->checkout->checkoutExistingOrder($uid, $order, $pointsMinor);
+            $result = $this->checkout->checkoutExistingOrder($uid, $order, $pointsMinor, $xRequestId);
         } catch (RuntimeException $e) {
             return response()->json(ApiResponse::error(40001, $e->getMessage()), 422);
         }
@@ -73,11 +76,12 @@ class MallCheckoutController extends Controller
 
     /**
      * @return array<string, mixed>
+     *
      * @throws FoundationAuthRequiredException
      */
     private function requireAuthenticatedUser(Request $request): array
     {
-        $token = trim((string)$request->header('X-User-Access-Token', ''));
+        $token = trim((string) $request->header('X-User-Access-Token', ''));
         if ($token === '') {
             throw new FoundationAuthRequiredException(
                 'Authentication required. Send header: X-User-Access-Token: <access_token> (raw JWT, no Bearer prefix).'
@@ -91,7 +95,7 @@ class MallCheckoutController extends Controller
     {
         return response()->json(
             ApiResponse::error(
-                (int)config('mall_agg.foundation.unauthorized_code', 40101),
+                (int) config('mall_agg.foundation.unauthorized_code', 40101),
                 $e->getMessage()
             ),
             401

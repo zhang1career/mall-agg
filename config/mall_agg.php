@@ -72,15 +72,6 @@ return [
     | MALL_SAGA_* required; MALL_TCC_ACCESS_KEY as root tcc_access_key; MALL_TCC_FLOW_ID as pay step biz_id.
     | need_confirm must carry prepay (pay step is_need_confirm); TccBranchMeta.code must match tcc.checkout_branches.
     */
-    /*
-    | POST /api/snowflake/id before saga start: value sent as X-Request-Id on POST /api/saga/instances.
-    | Host from API_GATEWAY_BASE_URL (same as other foundation HTTP).
-    */
-    'snowflake' => [
-        'access_key' => env('MALL_SNOWFLAKE_ACCESS_KEY', ''),
-        'timeout_seconds' => (int) env('MALL_SNOWFLAKE_TIMEOUT_SECONDS', 5),
-    ],
-
     'saga' => [
         'timeout_seconds' => (int) env('MALL_SAGA_TIMEOUT_SECONDS', 10),
         'access_key' => env('MALL_SAGA_ACCESS_KEY', ''),

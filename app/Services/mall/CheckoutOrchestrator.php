@@ -23,7 +23,7 @@ final readonly class CheckoutOrchestrator
     /**
      * @return array{order: MallOrder, prepay: array<string, mixed>, points_tcc_idem_key: string|null, tid: string}
      */
-    public function checkoutExistingOrder(int $uid, MallOrder $order, int $pointsMinor): array
+    public function checkoutExistingOrder(int $uid, MallOrder $order, int $pointsMinor, string $xRequestId = '0'): array
     {
         if ($order->uid !== $uid) {
             throw new RuntimeException('Order does not belong to the current user.');
@@ -70,47 +70,50 @@ final readonly class CheckoutOrchestrator
 
         $lines = $this->orders->linesFromOrderItems($order);
 
-        $sagaData = $this->sagaCoordinator->start([
-            'access_key' => $accessKey,
-            'flow_id' => $flowId,
-            'tcc_access_key' => $tccAccessKey,
-            'context' => [
-                'uid' => $uid,
-                'order_id' => $order->id,
-                'lines' => $lines,
-                'points_minor' => $pointsMinor,
-            ],
-            'step_payloads' => (object) [
-                $inventoryStep => [
-                    'uid' => $uid,
-                    'lines' => $lines,
-                ],
-                $orderStep => [
+        $sagaData = $this->sagaCoordinator->start(
+            [
+                'access_key' => $accessKey,
+                'flow_id' => $flowId,
+                'tcc_access_key' => $tccAccessKey,
+                'context' => [
                     'uid' => $uid,
                     'order_id' => $order->id,
+                    'lines' => $lines,
+                    'points_minor' => $pointsMinor,
                 ],
-                $payStep => [
-                    'biz_id' => $tccFlowId,
-                    'auto_confirm' => false,
-                    'branches' => [
-                        [
-                            'branch_code' => $tryPointsBranch,
-                            'payload' => [
-                                'uid' => $uid,
-                                'order_id' => $order->id,
-                                'amount_minor' => $pointsMinor,
+                'step_payloads' => (object) [
+                    $inventoryStep => [
+                        'uid' => $uid,
+                        'lines' => $lines,
+                    ],
+                    $orderStep => [
+                        'uid' => $uid,
+                        'order_id' => $order->id,
+                    ],
+                    $payStep => [
+                        'biz_id' => $tccFlowId,
+                        'auto_confirm' => false,
+                        'branches' => [
+                            [
+                                'branch_code' => $tryPointsBranch,
+                                'payload' => [
+                                    'uid' => $uid,
+                                    'order_id' => $order->id,
+                                    'amount_minor' => $pointsMinor,
+                                ],
                             ],
-                        ],
-                        [
-                            'branch_code' => $prepayBranch,
-                            'payload' => [
-                                'order_id' => $order->id,
+                            [
+                                'branch_code' => $prepayBranch,
+                                'payload' => [
+                                    'order_id' => $order->id,
+                                ],
                             ],
                         ],
                     ],
                 ],
             ],
-        ]);
+            $xRequestId
+        );
 
         $ctx = $sagaData['context'] ?? null;
         if (! is_array($ctx)) {

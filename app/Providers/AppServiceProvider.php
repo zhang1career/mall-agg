@@ -28,12 +28,10 @@ use App\Services\mall\serv_fd\CmsProductClient;
 use App\Services\mall\serv_fd\SearchRecClient;
 use App\Services\Outbound\StubInventoryOutboundClient;
 use App\Services\Outbound\StubPaymentOutboundClient;
-use App\Services\Transaction\NullSagaStartRequestIdProvider;
 use App\Services\Transaction\SagaCoordinatorClient;
-use App\Services\Transaction\SagaStartRequestIdProvider;
-use App\Services\Transaction\SnowflakeSagaStartRequestIdProvider;
 use App\Services\Transaction\TccCoordinatorClient;
 use App\Services\XxlJobRegistry;
+use DateTimeZone;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Http;
@@ -95,19 +93,6 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(InventoryOutboundContract::class, StubInventoryOutboundClient::class);
         $this->app->singleton(PaymentOutboundContract::class, StubPaymentOutboundClient::class);
         $this->app->singleton(MallPointsTccService::class);
-        $this->app->singleton(SagaStartRequestIdProvider::class, function (Application $app) {
-            $key = trim((string) config('mall_agg.snowflake.access_key', ''));
-            if ($key === '') {
-                return new NullSagaStartRequestIdProvider;
-            }
-
-            return new SnowflakeSagaStartRequestIdProvider(
-                $app->make(ResolvedApiGatewayBaseUrl::class),
-                $key,
-                (int) config('mall_agg.snowflake.timeout_seconds', 5),
-            );
-        });
-
         $this->app->singleton(SagaCoordinatorClient::class);
         $this->app->singleton(TccCoordinatorClient::class);
         $this->app->singleton(CheckoutOrchestrator::class);
@@ -162,10 +147,13 @@ class AppServiceProvider extends ServiceProvider
             }
             $processors[] = new XRequestIdLogProcessor;
 
+            $tz = new DateTimeZone((string) config('app.timezone'));
+
             return new Logger(
                 $this->parseChannel($config),
                 [$this->prepareHandler($handler, $config)],
-                $processors
+                $processors,
+                $tz
             );
         });
 

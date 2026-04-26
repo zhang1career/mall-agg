@@ -60,11 +60,11 @@ CREATE TABLE IF NOT EXISTS `points_flow` (
     `oid` bigint(20) unsigned NOT NULL DEFAULT '0' COMMENT 'order ID',
     `amount_minor` bigint(20) NOT NULL DEFAULT '0',
     `state` tinyint(3) unsigned NOT NULL DEFAULT '0',
-    `try_idem_key` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+    `tcc_idem_key` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'TCC 幂等键，如 bigint-{分支序号}；非 TCC/后台记账行为 NULL',
     `ct` bigint(20) unsigned NOT NULL DEFAULT '0',
     `ut` bigint(20) unsigned NOT NULL DEFAULT '0',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uni_mall_points_flow_tcc_idem` (`try_idem_key`) USING BTREE,
+    UNIQUE KEY `uni_mall_points_flow_tcc_idem` (`tcc_idem_key`) USING BTREE,
     KEY `idx_mall_points_flow_user_order` (`uid`,`oid`) USING BTREE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='积分流水';
 

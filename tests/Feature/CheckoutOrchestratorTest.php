@@ -44,7 +44,10 @@ final class CheckoutOrchestratorTest extends TestCase
         $order = app(OrderCommandService::class)->createDraftPendingOrder(33, [['product_id' => 88, 'quantity' => 1]]);
 
         $saga = Mockery::mock(SagaCoordinatorClient::class);
-        $saga->shouldReceive('start')->once()->withArgs(function (array $body): bool {
+        $saga->shouldReceive('start')->once()->withArgs(function (array $body, string $xRequestId): bool {
+            if ($xRequestId !== '0') {
+                return false;
+            }
             if ((int) ($body['flow_id'] ?? 0) !== 7
                 || (string) ($body['access_key'] ?? '') !== 'ak'
                 || (string) ($body['tcc_access_key'] ?? '') !== 'tcc'
