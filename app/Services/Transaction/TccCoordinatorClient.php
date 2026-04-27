@@ -6,6 +6,7 @@ namespace App\Services\Transaction;
 
 use App\Enums\TccCancelReason;
 use App\Services\api_gw\ResolvedApiGatewayBaseUrl;
+use App\Services\mall\serv_fd\TccTxClient;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -13,6 +14,7 @@ final readonly class TccCoordinatorClient
 {
     public function __construct(
         private ResolvedApiGatewayBaseUrl $gateway,
+        private TccTxClient               $foundationTccTx,
     ) {}
 
     /**
@@ -66,21 +68,7 @@ final readonly class TccCoordinatorClient
      */
     public function confirm(int|string $idemKey): array
     {
-        $key = trim((string) $idemKey);
-        if ($key === '' || ! ctype_digit($key)) {
-            throw new RuntimeException('idem_key must be a non-empty decimal string.');
-        }
-        $url = $this->gateway->resolvePathSuffix('/api/tcc/tx/'.rawurlencode($key).'/confirm');
-        if ($url === '') {
-            throw new RuntimeException('API gateway base URL is not configured.');
-        }
-        $timeout = (int) config('mall_agg.tcc.timeout_seconds', 15);
-        $response = Http::timeout($timeout)->acceptJson()->post($url, []);
-        if (! $response->successful()) {
-            throw new RuntimeException('TCC confirm HTTP '.$response->status());
-        }
-
-        return CoordinatorEnvelope::dataOrFail($response->json(), 'tcc confirm');
+        return $this->foundationTccTx->confirm((string) $idemKey);
     }
 
     /**

@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Internal;
 use App\Components\ApiResponse;
 use App\Http\Controllers\Controller;
 use App\Services\mall\Internal\InternalPayParticipantService;
+use App\Services\mall\serv_fd\TccTxClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use RuntimeException;
@@ -15,29 +16,39 @@ final class PayParticipantController extends Controller
 {
     public function __construct(
         private readonly InternalPayParticipantService $pay,
+        private readonly TccTxClient                   $foundationTccTx,
     ) {}
 
-    public function action(Request $request): JsonResponse
+    public function confirm(Request $request): JsonResponse
     {
         $data = $this->sagaParticipantData($request);
         $orderId = (int) ($data['order_id'] ?? 0);
-        $idem = (string) ($data['saga_step_idem_key'] ?? '');
+        $idemKey = trim((string) ($data['idem_key'] ?? ''));
 
         if ($orderId < 1) {
             return response()->json(ApiResponse::error(100, 'Invalid order_id.'), 200);
         }
+        if ($idemKey === '') {
+            return response()->json(ApiResponse::error(100, 'idem_key is required.'), 200);
+        }
+        if (! ctype_digit($idemKey)) {
+            return response()->json(ApiResponse::error(100, 'idem_key must be a decimal integer string.'), 200);
+        }
 
         try {
-            $out = $this->pay->actionPhase($orderId, $idem);
+            $tcc = $this->foundationTccTx->confirm($idemKey);
         } catch (RuntimeException $e) {
             return response()->json(ApiResponse::error(100, $e->getMessage()), 200);
         }
 
-        return response()->json(ApiResponse::ok($out));
+        return response()->json(ApiResponse::ok([
+            'order_id' => $orderId,
+            'tcc' => $tcc,
+        ]));
     }
 
     /**
-     * TCC coordinator Try for branch {@code prepay} (same prepay body as {@see action}, different idempotency field).
+     * TCC coordinator Try for branch {@code prepay}.
      */
     public function try(Request $request): JsonResponse
     {
@@ -58,7 +69,7 @@ final class PayParticipantController extends Controller
         return response()->json(ApiResponse::ok($out));
     }
 
-    public function compensate(Request $request): JsonResponse
+    public function cancel(Request $request): JsonResponse
     {
         $data = $this->sagaParticipantData($request);
         $orderId = (int) ($data['order_id'] ?? 0);
@@ -69,7 +80,7 @@ final class PayParticipantController extends Controller
         }
 
         try {
-            $this->pay->compensatePhase($orderId, $idem);
+            $this->pay->cancelPhase($orderId, $idem);
         } catch (RuntimeException $e) {
             return response()->json(ApiResponse::error(100, $e->getMessage()), 200);
         }

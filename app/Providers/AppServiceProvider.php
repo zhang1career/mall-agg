@@ -25,9 +25,10 @@ use App\Services\mall\OrderCommandService;
 use App\Services\mall\ProductInventoryService;
 use App\Services\mall\ProductPriceService;
 use App\Services\mall\serv_fd\CmsProductClient;
+use App\Services\mall\serv_fd\TccTxClient;
 use App\Services\mall\serv_fd\SearchRecClient;
-use App\Services\Outbound\StubInventoryOutboundClient;
-use App\Services\Outbound\StubPaymentOutboundClient;
+use App\Services\outbound\StubInventoryOutboundClient;
+use App\Services\outbound\StubPaymentOutboundClient;
 use App\Services\Transaction\SagaCoordinatorClient;
 use App\Services\Transaction\TccCoordinatorClient;
 use App\Services\XxlJobRegistry;
@@ -82,6 +83,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->app->singleton(CmsProductClient::class, fn () => CmsProductClient::fromConfig());
+        $this->app->singleton(TccTxClient::class, fn () => TccTxClient::fromConfig());
         $this->app->singleton(SearchRecClient::class, fn () => SearchRecClient::fromConfig());
         $this->app->singleton(ProductPriceService::class);
         $this->app->singleton(ProductInventoryService::class);

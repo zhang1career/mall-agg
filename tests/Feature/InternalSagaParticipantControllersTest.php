@@ -103,7 +103,7 @@ final class InternalSagaParticipantControllersTest extends TestCase
         $this->assertSame(42_001, (int) $order->saga_idem_key);
     }
 
-    public function test_pay_action_creates_prepay_stub(): void
+    public function test_pay_try_creates_prepay_stub(): void
     {
         $this->mock(InventoryOutboundContract::class, function ($mock): void {
             $mock->shouldReceive('reserve')->once()->andReturn(['reserve_id' => 'rev-pay-1']);
@@ -141,10 +141,10 @@ final class InternalSagaParticipantControllersTest extends TestCase
         $order->cash_payable_minor = (int) $order->total_price;
         $order->save();
 
-        $this->postJson('/internal/pay/action', [
+        $this->postJson('/internal/pay/try', [
+            'idempotency_key' => 'pay-'.bin2hex(random_bytes(2)),
             'payload' => [
                 'order_id' => $order->id,
-                'saga_step_idem_key' => 'pay-'.bin2hex(random_bytes(2)),
             ],
         ])
             ->assertOk()

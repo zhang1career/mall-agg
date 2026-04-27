@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Outbound;
+namespace App\Services\outbound;
 
 use App\Contracts\PaymentOutboundContract;
 
@@ -11,7 +11,7 @@ use App\Contracts\PaymentOutboundContract;
  */
 final class StubPaymentOutboundClient implements PaymentOutboundContract
 {
-    public function createPrepay(int $orderId, int $amountMinor, int $uid): array
+    public function prepay(string $idemKey, int $orderId, int $amountMinor, int $uid): array
     {
         return [
             'order_id' => $orderId,
@@ -21,5 +21,5 @@ final class StubPaymentOutboundClient implements PaymentOutboundContract
         ];
     }
 
-    public function cancelPrepay(int $orderId): void {}
+    public function cancel(int $orderId): void {}
 }
