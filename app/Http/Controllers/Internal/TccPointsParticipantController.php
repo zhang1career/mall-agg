@@ -28,7 +28,7 @@ final class TccPointsParticipantController extends Controller
         $uid = (int) ($data['uid'] ?? 0);
         $amountMinor = (int) ($data['amount_minor'] ?? 0);
         $orderId = isset($data['order_id']) ? (int) $data['order_id'] : null;
-        $tccIdemKey = $this->tccIdemKeyFromPayload($data);
+        $tccIdemKey = $this->resolveBranchIdem($request, $data);
         if ($uid < 1 || $amountMinor < 0 || $tccIdemKey === '') {
             return response()->json(ApiResponse::error(100, 'Invalid TCC try payload.'), 200);
         }
@@ -51,15 +51,15 @@ final class TccPointsParticipantController extends Controller
             }
         }
 
-        return response()->json(ApiResponse::ok(['tcc_idem_key' => $tccIdemKey]));
+        return response()->json(ApiResponse::ok([]));
     }
 
     public function confirm(Request $request): JsonResponse
     {
         $data = $this->tccPhasePayload($request);
-        $tccIdemKey = $this->tccIdemKeyFromPayload($data);
+        $tccIdemKey = $this->resolveBranchIdem($request, $data);
         if ($tccIdemKey === '') {
-            return response()->json(ApiResponse::error(100, 'Missing tcc_idem_key.'), 200);
+            return response()->json(ApiResponse::error(100, 'X-Request-Id or branch idempotency key required.'), 200);
         }
 
         try {
@@ -68,15 +68,15 @@ final class TccPointsParticipantController extends Controller
             return response()->json(ApiResponse::error(100, $e->getMessage()), 200);
         }
 
-        return response()->json(ApiResponse::ok(['tcc_idem_key' => $tccIdemKey]));
+        return response()->json(ApiResponse::ok([]));
     }
 
     public function cancel(Request $request): JsonResponse
     {
         $data = $this->tccPhasePayload($request);
-        $tccIdemKey = $this->tccIdemKeyFromPayload($data);
+        $tccIdemKey = $this->resolveBranchIdem($request, $data);
         if ($tccIdemKey === '') {
-            return response()->json(ApiResponse::error(100, 'Missing tcc_idem_key.'), 200);
+            return response()->json(ApiResponse::error(100, 'X-Request-Id or branch idempotency key required.'), 200);
         }
 
         try {
@@ -85,17 +85,28 @@ final class TccPointsParticipantController extends Controller
             return response()->json(ApiResponse::error(100, $e->getMessage()), 200);
         }
 
-        return response()->json(ApiResponse::ok(['tcc_idem_key' => $tccIdemKey]));
+        return response()->json(ApiResponse::ok([]));
     }
 
     /**
+     * Branch idempotency: prefer {@code X-Request-Id}, else {@code idempotency_key}, else legacy body {@code tcc_idem_key}.
+     *
      * @param  array<string, mixed>  $data
      */
-    private function tccIdemKeyFromPayload(array $data): string
+    private function resolveBranchIdem(Request $request, array $data): string
     {
+        $xr = trim((string) ($request->header('X-Request-Id') ?? ''));
+        if ($xr !== '') {
+            return $xr;
+        }
+        $idem = $request->input('idempotency_key');
+        if (is_string($idem) && trim($idem) !== '') {
+            return trim($idem);
+        }
+
         $key = $data['tcc_idem_key'] ?? '';
 
-        return is_string($key) ? $key : (string) $key;
+        return is_string($key) ? trim($key) : trim((string) $key);
     }
 
     /**
@@ -136,13 +147,6 @@ final class TccPointsParticipantController extends Controller
                 $data['amount_minor'] = (int) $ctx['points_minor'];
             }
         }
-        if ($this->tccIdemKeyFromPayload($data) === '') {
-            $idem = $request->input('idempotency_key');
-            if (is_string($idem) && $idem !== '') {
-                $data['tcc_idem_key'] = $idem;
-            }
-        }
-
         return $data;
     }
 
@@ -151,14 +155,6 @@ final class TccPointsParticipantController extends Controller
      */
     private function tccPhasePayload(Request $request): array
     {
-        $data = $this->payload($request);
-        if ($this->tccIdemKeyFromPayload($data) === '') {
-            $idem = $request->input('idempotency_key');
-            if (is_string($idem) && $idem !== '') {
-                $data['tcc_idem_key'] = $idem;
-            }
-        }
-
-        return $data;
+        return $this->payload($request);
     }
 }

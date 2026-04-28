@@ -46,11 +46,10 @@ final readonly class CheckoutOrchestrator
             );
         }
 
-        $tccAccessKey = trim((string) config('mall_agg.tcc.access_key', ''));
         $tccFlowId = (int) config('mall_agg.tcc.flow_id', 0);
-        if ($tccFlowId < 1 || $tccAccessKey === '') {
+        if ($tccFlowId < 1) {
             throw new RuntimeException(
-                'TCC is not configured for checkout. Set MALL_TCC_FLOW_ID and MALL_TCC_ACCESS_KEY.'
+                'TCC is not configured for checkout. Set MALL_TCC_FLOW_ID.'
             );
         }
 
@@ -74,7 +73,6 @@ final readonly class CheckoutOrchestrator
             [
                 'access_key' => $accessKey,
                 'flow_id' => $flowId,
-                'tcc_access_key' => $tccAccessKey,
                 'context' => [
                     'uid' => $uid,
                     'order_id' => $order->id,
@@ -146,8 +144,7 @@ final readonly class CheckoutOrchestrator
         }
         $order->save();
 
-        $pointsKey = $ctx['tcc_idem_key'] ?? null;
-        $pointsKeyStr = is_string($pointsKey) && $pointsKey !== '' ? $pointsKey : null;
+        $pointsKeyStr = $this->pointsBranchIdemFromContext($ctx, $tryPointsBranch);
 
         $prepay = $this->assembleCheckoutPrepay($partial, $order, $uid);
 
@@ -185,6 +182,27 @@ final readonly class CheckoutOrchestrator
     /**
      * @return array<string, mixed>|null
      */
+    private function pointsBranchIdemFromContext(array $ctx, string $tryPointsBranchCode): ?string
+    {
+        $branches = $ctx['branches'] ?? null;
+        if (! is_array($branches)) {
+            return null;
+        }
+        foreach ($branches as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+            if (($entry['branch_code'] ?? '') !== $tryPointsBranchCode) {
+                continue;
+            }
+            $k = $entry['idem_key'] ?? null;
+
+            return is_string($k) && $k !== '' ? $k : null;
+        }
+
+        return null;
+    }
+
     private function extractPrepayFromCoordinatorResponse(array $response, string $prepayBranchCode): ?array
     {
         if (isset($response['prepay']) && is_array($response['prepay'])) {
@@ -194,20 +212,26 @@ final readonly class CheckoutOrchestrator
         if (! is_array($branches)) {
             return null;
         }
-        $entry = $branches[$prepayBranchCode] ?? null;
-        if (! is_array($entry)) {
+        foreach ($branches as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+            if (($entry['branch_code'] ?? '') !== $prepayBranchCode) {
+                continue;
+            }
+            $participantJson = $entry['data'] ?? null;
+            if (! is_array($participantJson)) {
+                return null;
+            }
+            $biz = $participantJson['data'] ?? null;
+            if (is_array($biz) && isset($biz['prepay']) && is_array($biz['prepay'])) {
+                return $biz['prepay'];
+            }
+            if (isset($participantJson['prepay']) && is_array($participantJson['prepay'])) {
+                return $participantJson['prepay'];
+            }
+
             return null;
-        }
-        $participantJson = $entry['data'] ?? null;
-        if (! is_array($participantJson)) {
-            return null;
-        }
-        $biz = $participantJson['data'] ?? null;
-        if (is_array($biz) && isset($biz['prepay']) && is_array($biz['prepay'])) {
-            return $biz['prepay'];
-        }
-        if (isset($participantJson['prepay']) && is_array($participantJson['prepay'])) {
-            return $participantJson['prepay'];
         }
 
         return null;

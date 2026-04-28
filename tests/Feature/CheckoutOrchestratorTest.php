@@ -32,7 +32,6 @@ final class CheckoutOrchestratorTest extends TestCase
         config()->set('mall_agg.saga.flow_id', 7);
         config()->set('mall_agg.saga.access_key', 'ak');
         config()->set('mall_agg.tcc.flow_id', 501);
-        config()->set('mall_agg.tcc.access_key', 'tcc');
 
         ProductPrice::query()->create([
             'pid' => 88,
@@ -50,7 +49,7 @@ final class CheckoutOrchestratorTest extends TestCase
             }
             if ((int) ($body['flow_id'] ?? 0) !== 7
                 || (string) ($body['access_key'] ?? '') !== 'ak'
-                || (string) ($body['tcc_access_key'] ?? '') !== 'tcc'
+                || array_key_exists('tcc_access_key', $body)
                 || (int) ($body['context']['order_id'] ?? 0) < 1
                 || (int) ($body['context']['points_minor'] ?? -1) !== 300) {
                 return false;
@@ -76,13 +75,19 @@ final class CheckoutOrchestratorTest extends TestCase
             'context' => [
                 'global_tx_id' => 'gtx-m',
                 'idem_key' => 55_055,
-                'tcc_idem_key' => 'ord:33:x',
+                'branches' => [
+                    [
+                        'branch_code' => 'try_points',
+                        'idem_key' => 'ord:33:x',
+                    ],
+                ],
             ],
             'need_confirm' => [
                 [
                     'response' => [
                         'branches' => [
-                            'prepay' => [
+                            [
+                                'branch_code' => 'prepay',
                                 'data' => [
                                     'errorCode' => 0,
                                     'data' => [
@@ -118,7 +123,6 @@ final class CheckoutOrchestratorTest extends TestCase
         config()->set('mall_agg.saga.flow_id', 7);
         config()->set('mall_agg.saga.access_key', 'ak');
         config()->set('mall_agg.tcc.flow_id', 1);
-        config()->set('mall_agg.tcc.access_key', 'tcc');
 
         ProductPrice::query()->create([
             'pid' => 1,

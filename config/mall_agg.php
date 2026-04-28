@@ -69,7 +69,7 @@ return [
 
     /*
     | Saga coordinator (POST /api/saga/instances). Checkout starts the flow; step_payloads use checkout_steps keys.
-    | MALL_SAGA_* required; MALL_TCC_ACCESS_KEY as root tcc_access_key; MALL_TCC_FLOW_ID as pay step biz_id.
+    | MALL_SAGA_* required; MALL_TCC_FLOW_ID as pay step payload.biz_id. Idempotency: X-Request-Id on saga start.
     | need_confirm must carry prepay (pay step is_need_confirm); TccBranchMeta.code must match tcc.checkout_branches.
     */
     'saga' => [
@@ -88,7 +88,6 @@ return [
 
     'tcc' => [
         'timeout_seconds' => (int) env('MALL_TCC_TIMEOUT_SECONDS', 15),
-        'access_key' => env('MALL_TCC_ACCESS_KEY', ''),
         'flow_id' => (int) env('MALL_TCC_FLOW_ID', 0),
         /*
         | TCC biz (MALL_TCC_FLOW_ID) branch codes for checkout pay step — must match DB TccBranchMeta.code for that biz.

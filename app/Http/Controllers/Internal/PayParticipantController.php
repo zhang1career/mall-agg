@@ -46,12 +46,18 @@ final class PayParticipantController extends Controller
         $data = $this->sagaParticipantData($request);
         $orderId = (int) ($data['order_id'] ?? 0);
         $idemKey = trim((string) ($data['idem_key'] ?? ''));
+        if ($idemKey === '') {
+            $xr = trim((string) ($request->header('X-Request-Id') ?? ''));
+            if ($xr !== '' && ctype_digit($xr)) {
+                $idemKey = $xr;
+            }
+        }
 
         if ($orderId < 1) {
             return response()->json(ApiResponse::error(100, 'Invalid order_id.'), 200);
         }
         if ($idemKey === '') {
-            return response()->json(ApiResponse::error(100, 'idem_key is required.'), 200);
+            return response()->json(ApiResponse::error(100, 'X-Request-Id or idem_key is required.'), 200);
         }
         if (! ctype_digit($idemKey)) {
             return response()->json(ApiResponse::error(100, 'idem_key must be a decimal integer string.'), 200);

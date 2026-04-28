@@ -50,6 +50,7 @@ final readonly class TccTxClient
         $response = Http::timeout($this->timeoutSeconds)
             ->acceptJson()
             ->asJson()
+            ->withHeaders(['X-Request-Id' => $key])
             ->post($url);
         if (! $response->successful()) {
             throw new RuntimeException('TCC confirm HTTP '.$response->status());

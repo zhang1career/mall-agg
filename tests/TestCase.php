@@ -26,7 +26,9 @@ abstract class TestCase extends BaseTestCase
             'prepay' => $prepay,
             'global_tx_id' => $globalTxId,
             'idem_key' => $tccCoordIdemKey,
-            'tcc_idem_key' => $pointsBranchIdemKey,
+            'branches' => [
+                ['branch_code' => 'try_points', 'idem_key' => $pointsBranchIdemKey ?? 'pts-mock'],
+            ],
         ];
 
         return [

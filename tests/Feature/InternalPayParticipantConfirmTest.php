@@ -46,6 +46,7 @@ final class InternalPayParticipantConfirmTest extends TestCase
             ->assertJsonPath('data.tcc.global_tx_id', 'gtx-1');
 
         Http::assertSent(fn ($req) => $req->method() === 'POST'
-            && $req->url() === 'http://serv-fd.test/api/tcc/tx/9001/confirm');
+            && $req->url() === 'http://serv-fd.test/api/tcc/tx/9001/confirm'
+            && $req->header('X-Request-Id')[0] === '9001');
     }
 }
