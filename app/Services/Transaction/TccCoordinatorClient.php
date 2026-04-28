@@ -72,6 +72,9 @@ final readonly class TccCoordinatorClient
     }
 
     /**
+     * Calls app_tcc `POST /api/tcc/tx/{idem_key}/cancel`. `cancel_reason` is optional on the coordinator;
+     * this client still sends {@see TccCancelReason} for clarity — empty `{}` is also accepted server-side.
+     *
      * @return array<string, mixed>
      */
     public function cancel(int|string $idemKey, TccCancelReason $reason = TccCancelReason::Unpaid): array

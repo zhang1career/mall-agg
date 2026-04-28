@@ -19,6 +19,28 @@ final class PayParticipantController extends Controller
         private readonly TccTxClient                   $foundationTccTx,
     ) {}
 
+    /**
+     * TCC coordinator Try for branch {@code prepay}.
+     */
+    public function try(Request $request): JsonResponse
+    {
+        $data = $this->payTryPayload($request);
+        $orderId = (int) ($data['order_id'] ?? 0);
+        $idem = trim((string) $request->input('idempotency_key', ''));
+
+        if ($orderId < 1) {
+            return response()->json(ApiResponse::error(100, 'Invalid order_id.'), 200);
+        }
+
+        try {
+            $out = $this->pay->tryPhase($orderId, $idem);
+        } catch (RuntimeException $e) {
+            return response()->json(ApiResponse::error(100, $e->getMessage()), 200);
+        }
+
+        return response()->json(ApiResponse::ok($out));
+    }
+
     public function confirm(Request $request): JsonResponse
     {
         $data = $this->sagaParticipantData($request);
@@ -45,28 +67,6 @@ final class PayParticipantController extends Controller
             'order_id' => $orderId,
             'tcc' => $tcc,
         ]));
-    }
-
-    /**
-     * TCC coordinator Try for branch {@code prepay}.
-     */
-    public function try(Request $request): JsonResponse
-    {
-        $data = $this->payTryPayload($request);
-        $orderId = (int) ($data['order_id'] ?? 0);
-        $idem = trim((string) $request->input('idempotency_key', ''));
-
-        if ($orderId < 1) {
-            return response()->json(ApiResponse::error(100, 'Invalid order_id.'), 200);
-        }
-
-        try {
-            $out = $this->pay->tryPhase($orderId, $idem);
-        } catch (RuntimeException $e) {
-            return response()->json(ApiResponse::error(100, $e->getMessage()), 200);
-        }
-
-        return response()->json(ApiResponse::ok($out));
     }
 
     public function cancel(Request $request): JsonResponse
