@@ -1067,7 +1067,7 @@
           "InternalInventory"
         ],
         "summary": "库存 Saga compensate（释放/恢复）",
-        "description": "请求体可为根级 `inventory_token` 或 `payload` 包裹。远程模式下 release；本地模式下回滚数量。",
+        "description": "Saga 协调器信封：从 `context.inventory_token` 读取（与 action 响应 `data` 合并字段一致）。远程 release / 本地回滚。",
         "parameters": [
           {
             "$ref": "#/components/parameters/TraceId"
@@ -1078,7 +1078,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/InternalInventoryTokenBody"
+                "$ref": "#/components/schemas/InternalSagaInventoryCompensateBody"
               }
             }
           }
@@ -2033,35 +2033,28 @@
           }
         ]
       },
-      "InternalInventoryTokenPayload": {
+      "InternalSagaInventoryCompensateBody": {
         "type": "object",
         "required": [
-          "inventory_token"
+          "context"
         ],
         "properties": {
-          "inventory_token": {
-            "type": "string",
-            "minLength": 1
-          }
-        }
-      },
-      "InternalInventoryTokenBody": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/InternalInventoryTokenPayload"
-          },
-          {
+          "context": {
             "type": "object",
             "required": [
-              "payload"
+              "inventory_token"
             ],
             "properties": {
-              "payload": {
-                "$ref": "#/components/schemas/InternalInventoryTokenPayload"
+              "inventory_token": {
+                "type": "string",
+                "minLength": 1
               }
             }
+          },
+          "payload": {
+            "type": "object"
           }
-        ]
+        }
       },
       "InternalOrderTryPayload": {
         "type": "object",

@@ -35,8 +35,8 @@ final class InventoryParticipantController extends Controller
 
     public function compensate(Request $request): JsonResponse
     {
-        $data = $this->payload($request);
-        $token = (string) ($data['inventory_token'] ?? '');
+        $ctx = $request->input('context');
+        $token = is_array($ctx) ? trim((string) ($ctx['inventory_token'] ?? '')) : '';
 
         try {
             $this->inventory->compensatePhase($token);

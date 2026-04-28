@@ -51,7 +51,8 @@ final class InternalSagaParticipantControllersTest extends TestCase
             ->assertJsonPath('data.inventory_token', 'rev-remote-1');
 
         $this->postJson('/internal/inventory/compensate', [
-            'payload' => ['inventory_token' => 'rev-remote-1'],
+            'context' => ['inventory_token' => 'rev-remote-1', 'mode' => 'remote'],
+            'payload' => [],
         ])
             ->assertOk()
             ->assertJsonPath('errorCode', 0);
