@@ -46,9 +46,9 @@ class TccPointsParticipantControllerTest extends TestCase
         $try->assertOk()->assertJsonPath('errorCode', 0);
         $this->assertSame(400, (int) MallPointsBalance::query()->where('uid', 9)->value('balance_minor'));
 
-        $this->postJson('/internal/points/confirm', [
-            'tcc_idem_key' => 'idem-1',
-        ])->assertOk()->assertJsonPath('errorCode', 0);
+        $this->postJson('/internal/points/confirm', [], ['X-Request-Id' => 'idem-1'])
+            ->assertOk()
+            ->assertJsonPath('errorCode', 0);
 
         $hold = PointsFlow::query()->where('tcc_idem_key', 'idem-1')->first();
         $this->assertNotNull($hold);
@@ -134,11 +134,12 @@ class TccPointsParticipantControllerTest extends TestCase
         $this->assertSame(1, (int) PointsFlow::query()->where('tcc_idem_key', 'idem-dup')->count());
     }
 
-    public function test_confirm_rejects_missing_tcc_idem_key(): void
+    public function test_confirm_rejects_missing_idem(): void
     {
         $this->postJson('/internal/points/confirm', [])
             ->assertOk()
             ->assertJsonPath('errorCode', 100)
-            ->assertJsonPath('message', 'Missing tcc_idem_key.');
+            ->assertJsonPath('message', 'X-Request-Id or branch idempotency key required.');
     }
+
 }

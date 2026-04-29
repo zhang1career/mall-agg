@@ -25,7 +25,6 @@ class MallCheckoutControllerTest extends TestCase
         config()->set('mall_agg.saga.flow_id', 7);
         config()->set('mall_agg.saga.access_key', 'checkout-test-ak');
         config()->set('mall_agg.tcc.flow_id', 501);
-        config()->set('mall_agg.tcc.access_key', 'tcc-ak');
     }
 
     private function fakeUserMe(int $userId, array $contextOverrides = []): void
@@ -33,7 +32,9 @@ class MallCheckoutControllerTest extends TestCase
         $ctx = array_merge([
             'global_tx_id' => 'gtx-fe',
             'idem_key' => 77_002,
-            'tcc_idem_key' => null,
+            'branches' => [
+                ['branch_code' => 'try_points', 'idem_key' => 'pts-default'],
+            ],
         ], $contextOverrides);
         unset($ctx['prepay']);
 
@@ -55,7 +56,8 @@ class MallCheckoutControllerTest extends TestCase
                 [
                     'response' => [
                         'branches' => [
-                            'prepay' => [
+                            [
+                                'branch_code' => 'prepay',
                                 'data' => [
                                     'errorCode' => 0,
                                     'data' => ['prepay' => $prepayPartial],
@@ -97,7 +99,9 @@ class MallCheckoutControllerTest extends TestCase
     {
         $this->fakeUserMe(42, [
             'prepay' => ['stub' => true, 'amount_minor' => 50],
-            'tcc_idem_key' => 'ord:1:ab',
+            'branches' => [
+                ['branch_code' => 'try_points', 'idem_key' => 'ord:1:ab'],
+            ],
         ]);
 
         ProductPrice::query()->create([

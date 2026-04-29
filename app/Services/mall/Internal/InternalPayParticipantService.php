@@ -27,31 +27,15 @@ final class InternalPayParticipantService
     ) {}
 
     /**
-     * @return array<string, mixed>
-     */
-    public function actionPhase(int $orderId, string $sagaStepIdemKey): array
-    {
-        return $this->runPrepayTry($orderId, $sagaStepIdemKey, 'saga_step_idem_key');
-    }
-
-    /**
      * TCC Try branch {@see PayParticipantController::try} uses coordinator {@code idempotency_key}.
      *
      * @return array<string, mixed>
      */
-    public function tryPhase(int $orderId, string $idempotencyKey): array
-    {
-        return $this->runPrepayTry($orderId, $idempotencyKey, 'idempotency_key');
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function runPrepayTry(int $orderId, string $idemRaw, string $idemFieldLabel): array
+    public function tryPhase(int $orderId, string $idemRaw): array
     {
         $idem = trim($idemRaw);
         if ($idem === '') {
-            throw new RuntimeException($idemFieldLabel.' is required.');
+            throw new RuntimeException('idem key is required.');
         }
 
         $cacheKey = self::TRY_CACHE.$idem;
@@ -65,15 +49,15 @@ final class InternalPayParticipantService
             throw new RuntimeException('Order must be pending to start payment.');
         }
 
-        $amount = (int) $order->cash_payable_minor;
+        $amount = $order->cash_payable_minor;
         if ($amount < 1) {
-            $amount = (int) $order->total_price - (int) $order->points_deduct_minor;
+            $amount = $order->total_price - $order->points_deduct_minor;
         }
         if ($amount < 1) {
             throw new RuntimeException('Order has no payable cash amount for prepay.');
         }
 
-        $prepay = $this->payment->createPrepay($orderId, $amount, (int) $order->uid);
+        $prepay = $this->payment->prepay($idem, $orderId, $amount, $order->uid);
         $out = ['prepay' => array_merge(['order_id' => $orderId], $prepay)];
         Cache::put($cacheKey, $out, self::CACHE_TTL_SECONDS);
 
@@ -83,7 +67,7 @@ final class InternalPayParticipantService
         return $out;
     }
 
-    public function compensatePhase(int $orderId, string $sagaStepIdemKey): void
+    public function cancelPhase(int $orderId, string $sagaStepIdemKey): void
     {
         if (trim($sagaStepIdemKey) === '') {
             throw new RuntimeException('saga_step_idem_key is required.');
@@ -91,6 +75,6 @@ final class InternalPayParticipantService
 
         $idem = trim($sagaStepIdemKey);
         Cache::forget(self::TRY_CACHE.$idem);
-        $this->payment->cancelPrepay($orderId);
+        $this->payment->cancel($orderId);
     }
 }

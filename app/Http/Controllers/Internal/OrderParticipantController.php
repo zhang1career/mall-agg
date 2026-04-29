@@ -77,7 +77,7 @@ final class OrderParticipantController extends Controller
     }
 
     /**
-     * Saga sends inventory_token in merged context after step 0; saga idem_key on the envelope root.
+     * Saga sends inventory_token in merged context after step 0; saga instance idem: header X-Request-Id (or legacy body idem_key).
      *
      * @return array<string, mixed>
      */
@@ -88,6 +88,12 @@ final class OrderParticipantController extends Controller
         if (is_array($ctx)) {
             if (trim((string) ($data['inventory_token'] ?? '')) === '' && isset($ctx['inventory_token'])) {
                 $data['inventory_token'] = (string) $ctx['inventory_token'];
+            }
+        }
+        if (($data['saga_idem_key'] ?? 0) < 1) {
+            $xr = trim((string) ($request->header('X-Request-Id') ?? ''));
+            if ($xr !== '' && ctype_digit($xr)) {
+                $data['saga_idem_key'] = (int) $xr;
             }
         }
         if (($data['saga_idem_key'] ?? 0) < 1) {

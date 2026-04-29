@@ -18,14 +18,22 @@ final readonly class SagaCoordinatorClient
      * @param  array<string, mixed>  $body
      * @return array<string, mixed>
      */
-    public function start(array $body): array
+    public function start(array $body, string $xRequestId = '0'): array
     {
         $url = $this->gateway->resolvePathSuffix('/api/saga/instances');
         if ($url === '') {
             throw new RuntimeException('API gateway base URL is not configured.');
         }
         $timeout = (int) config('mall_agg.saga.timeout_seconds', 10);
-        $response = Http::timeout($timeout)->acceptJson()->asJson()->post($url, $body);
+        $rid = trim($xRequestId);
+        if ($rid === '') {
+            $rid = '0';
+        }
+        $req = Http::timeout($timeout)
+            ->acceptJson()
+            ->asJson()
+            ->withHeaders(['X-Request-Id' => $rid]);
+        $response = $req->post($url, $body);
         if (! $response->successful()) {
             throw new RuntimeException('Saga start HTTP '.$response->status());
         }

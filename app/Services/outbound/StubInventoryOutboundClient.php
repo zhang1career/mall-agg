@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Outbound;
+namespace App\Services\outbound;
 
 use App\Contracts\InventoryOutboundContract;
 use Illuminate\Support\Str;

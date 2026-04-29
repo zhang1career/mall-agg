@@ -21,7 +21,6 @@ trait LogsHandledApiRequests
             'route_uri' => $request->route()?->uri(),
             'ip' => $request->ip(),
             'x_forwarded_for' => $request->header('X-Forwarded-For'),
-            'x_trace_id' => $request->header('X-Trace-Id'),
             'user_agent' => $request->userAgent(),
             'query' => $request->query(),
             'input' => $this->sanitizeRequestInput($request->all()),

@@ -5,6 +5,7 @@
 
 # Cursor
 .cursorrules
+DEPLOY.md
 
 /.phpunit.cache
 /node_modules

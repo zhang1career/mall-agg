@@ -7,6 +7,7 @@ use App\Contracts\PaymentOutboundContract;
 use App\Http\Client\OutboundHttpDebugMiddleware;
 use App\Infrastructure\ServiceDiscovery\LaravelRedisStringClient;
 use App\Logging\monolog\TodayAppLogHandler;
+use App\Logging\Processors\XRequestIdLogProcessor;
 use App\Queue\Connectors\DatabaseMillisConnector;
 use App\Queue\Failed\DatabaseUuidFailedJobProviderMillis;
 use App\Services\api_gw\MemoizedServiceDiscoveryUrl;
@@ -24,12 +25,14 @@ use App\Services\mall\OrderCommandService;
 use App\Services\mall\ProductInventoryService;
 use App\Services\mall\ProductPriceService;
 use App\Services\mall\serv_fd\CmsProductClient;
+use App\Services\mall\serv_fd\TccTxClient;
 use App\Services\mall\serv_fd\SearchRecClient;
-use App\Services\Outbound\StubInventoryOutboundClient;
-use App\Services\Outbound\StubPaymentOutboundClient;
+use App\Services\outbound\StubInventoryOutboundClient;
+use App\Services\outbound\StubPaymentOutboundClient;
 use App\Services\Transaction\SagaCoordinatorClient;
 use App\Services\Transaction\TccCoordinatorClient;
 use App\Services\XxlJobRegistry;
+use DateTimeZone;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Http;
@@ -80,6 +83,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->app->singleton(CmsProductClient::class, fn () => CmsProductClient::fromConfig());
+        $this->app->singleton(TccTxClient::class, fn () => TccTxClient::fromConfig());
         $this->app->singleton(SearchRecClient::class, fn () => SearchRecClient::fromConfig());
         $this->app->singleton(ProductPriceService::class);
         $this->app->singleton(ProductInventoryService::class);
@@ -139,10 +143,19 @@ class AppServiceProvider extends ServiceProvider
                 $config['locking'] ?? false
             );
 
+            $processors = [];
+            if ($config['replace_placeholders'] ?? false) {
+                $processors[] = new PsrLogMessageProcessor;
+            }
+            $processors[] = new XRequestIdLogProcessor;
+
+            $tz = new DateTimeZone((string) config('app.timezone'));
+
             return new Logger(
                 $this->parseChannel($config),
                 [$this->prepareHandler($handler, $config)],
-                $config['replace_placeholders'] ?? false ? [new PsrLogMessageProcessor] : []
+                $processors,
+                $tz
             );
         });
 

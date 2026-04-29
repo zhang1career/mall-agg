@@ -22,9 +22,10 @@ final class SagaCoordinatorClientTest extends TestCase
         parent::setUp();
         config()->set('api_gw.base_url', 'http://gw.test');
         config()->set('mall_agg.saga.timeout_seconds', 5);
+        $this->app->forgetInstance(SagaCoordinatorClient::class);
     }
 
-    public function test_start_posts_expected_path_and_returns_data_envelope(): void
+    public function test_start_posts_x_request_id_default_zero_when_omitted(): void
     {
         Http::fake([
             'http://gw.test/api/saga/instances' => Http::response([
@@ -46,9 +47,41 @@ final class SagaCoordinatorClientTest extends TestCase
 
         $this->assertSame(900, $out['saga_instance_id']);
         Http::assertSent(function ($request) {
-            return $request->url() === 'http://gw.test/api/saga/instances'
-                && $request->method() === 'POST'
-                && ($request->data()['flow_id'] ?? null) === 7;
+            if ($request->url() !== 'http://gw.test/api/saga/instances' || $request->method() !== 'POST') {
+                return false;
+            }
+            $h = $request->header('X-Request-Id');
+
+            return $h === ['0'] || $h === '0';
+        });
+    }
+
+    public function test_start_posts_x_request_id_from_second_argument(): void
+    {
+        Http::fake([
+            'http://gw.test/api/saga/instances' => Http::response([
+                'errorCode' => 0,
+                'data' => ['saga_instance_id' => 900],
+                'message' => '',
+            ], 200),
+        ]);
+
+        $out = app(SagaCoordinatorClient::class)->start(
+            [
+                'access_key' => 'k',
+                'flow_id' => 1,
+            ],
+            'client-req-99'
+        );
+
+        $this->assertSame(900, $out['saga_instance_id']);
+        Http::assertSent(function ($request) {
+            if ($request->url() !== 'http://gw.test/api/saga/instances' || $request->method() !== 'POST') {
+                return false;
+            }
+            $h = $request->header('X-Request-Id');
+
+            return $h === ['client-req-99'] || $h === 'client-req-99';
         });
     }
 
