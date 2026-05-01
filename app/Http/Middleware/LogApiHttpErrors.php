@@ -6,6 +6,7 @@ use App\Components\ApiResponse;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Paganini\Constants\ResponseConstant;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -47,7 +48,7 @@ class LogApiHttpErrors
             $message = (string) config('mall_agg.api.normalize_5xx_message', '服务器内部错误');
 
             return response()->json(
-                ApiResponse::error(2, $message, $reqId),
+                ApiResponse::error(ResponseConstant::RET_UNKNOWN, $message, $reqId),
                 $status
             );
         }

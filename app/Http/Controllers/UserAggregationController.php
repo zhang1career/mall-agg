@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Components\ApiResponse;
@@ -10,6 +12,7 @@ use App\Services\user\UserFoundationGateway;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Paganini\Capability\ProviderRegistry;
+use Paganini\Constants\ResponseConstant;
 
 class UserAggregationController extends Controller
 {
@@ -22,20 +25,12 @@ class UserAggregationController extends Controller
     ): JsonResponse {
         $token = trim((string) $request->header('X-User-Access-Token', ''));
         if ($token === '') {
-            return response()->json(ApiResponse::error(
-                (int) config('mall_agg.foundation.unauthorized_code', 40101),
+            throw new FoundationAuthRequiredException(
                 'Authentication required. Call POST /api/user/login first, store access_token on the client, then send header: X-User-Access-Token: <access_token> (raw JWT, no Bearer prefix).'
-            ), 401);
+            );
         }
 
-        try {
-            $baseUser = $foundationGateway->fetchCurrentUser($request);
-        } catch (FoundationAuthRequiredException $e) {
-            return response()->json(ApiResponse::error(
-                (int) config('mall_agg.foundation.unauthorized_code', 40101),
-                $e->getMessage()
-            ), 401);
-        }
+        $baseUser = $foundationGateway->fetchCurrentUser($request);
 
         $this->logHandledApiRequest($request, [
             'handler' => 'me',
@@ -59,7 +54,7 @@ class UserAggregationController extends Controller
 
         $hasDegraded = $result->hasDegraded();
         $responseCode = $hasDegraded
-            ? (int) config('mall_agg.degrade.partial_failure_code', 20601)
+            ? (int) config('mall_agg.degrade.partial_failure_code', ResponseConstant::RET_DEPENDENCY_ERROR)
             : 0;
         $responseMsg = $hasDegraded
             ? (string) config('mall_agg.degrade.partial_failure_message', 'Partially failed, degraded by aggregator.')

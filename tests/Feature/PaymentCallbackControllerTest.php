@@ -102,6 +102,6 @@ final class PaymentCallbackControllerTest extends TestCase
             'status' => 'paid',
         ], ['X-Payment-Callback-Token' => 'wrong'])
             ->assertStatus(403)
-            ->assertJsonPath('errorCode', 40301);
+            ->assertJsonPath('errorCode', 201);
     }
 }

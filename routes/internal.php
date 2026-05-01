@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Internal\InventoryParticipantController;
-use App\Http\Controllers\Internal\OrderParticipantController;
-use App\Http\Controllers\Internal\PayParticipantController;
-use App\Http\Controllers\Internal\TccPointsParticipantController;
+use App\Http\Controllers\internal\InventoryParticipantController;
+use App\Http\Controllers\internal\OrderParticipantController;
+use App\Http\Controllers\internal\PayParticipantController;
+use App\Http\Controllers\internal\TccPointsParticipantController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('inventory/action', [InventoryParticipantController::class, 'action']);

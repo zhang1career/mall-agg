@@ -100,7 +100,7 @@ class TccPointsParticipantControllerTest extends TestCase
             'tcc_idem_key' => 'idem-low',
         ])
             ->assertOk()
-            ->assertJsonPath('errorCode', 100)
+            ->assertJsonPath('errorCode', 300)
             ->assertJsonPath('message', 'Insufficient points.');
 
         $this->assertSame(10, (int) MallPointsBalance::query()->where('uid', 12)->value('balance_minor'));
@@ -138,8 +138,7 @@ class TccPointsParticipantControllerTest extends TestCase
     {
         $this->postJson('/internal/points/confirm', [])
             ->assertOk()
-            ->assertJsonPath('errorCode', 100)
+            ->assertJsonPath('errorCode', 101)
             ->assertJsonPath('message', 'X-Request-Id or branch idempotency key required.');
     }
-
 }

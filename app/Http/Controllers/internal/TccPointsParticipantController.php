@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Internal;
+namespace App\Http\Controllers\internal;
 
 use App\Components\ApiResponse;
 use App\Enums\CheckoutPhase;
@@ -11,7 +11,7 @@ use App\Models\MallOrder;
 use App\Services\mall\MallPointsTccService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use RuntimeException;
+use Paganini\Constants\ResponseConstant;
 
 /**
  * Points TCC participant (Try / Confirm / Cancel); routed as `POST /internal/points/*`.
@@ -30,15 +30,11 @@ final class TccPointsParticipantController extends Controller
         $orderId = isset($data['order_id']) ? (int) $data['order_id'] : null;
         $tccIdemKey = $this->resolveBranchIdem($request, $data);
         if ($uid < 1 || $amountMinor < 0 || $tccIdemKey === '') {
-            return response()->json(ApiResponse::error(100, 'Invalid TCC try payload.'), 200);
+            return response()->json(ApiResponse::error(ResponseConstant::RET_INVALID_PARAM, 'Invalid TCC try payload.'));
         }
 
         if ($amountMinor > 0) {
-            try {
-                $this->points->tryFreeze($uid, $amountMinor, $orderId, $tccIdemKey);
-            } catch (RuntimeException $e) {
-                return response()->json(ApiResponse::error(100, $e->getMessage()), 200);
-            }
+            $this->points->tryFreeze($uid, $amountMinor, $orderId, $tccIdemKey);
         }
 
         if ($orderId !== null && $orderId > 0) {
@@ -59,14 +55,10 @@ final class TccPointsParticipantController extends Controller
         $data = $this->tccPhasePayload($request);
         $tccIdemKey = $this->resolveBranchIdem($request, $data);
         if ($tccIdemKey === '') {
-            return response()->json(ApiResponse::error(100, 'X-Request-Id or branch idempotency key required.'), 200);
+            return response()->json(ApiResponse::error(ResponseConstant::RET_MISSING_PARAM, 'X-Request-Id or branch idempotency key required.'));
         }
 
-        try {
-            $this->points->confirm($tccIdemKey);
-        } catch (RuntimeException $e) {
-            return response()->json(ApiResponse::error(100, $e->getMessage()), 200);
-        }
+        $this->points->confirm($tccIdemKey);
 
         return response()->json(ApiResponse::ok([]));
     }
@@ -76,14 +68,10 @@ final class TccPointsParticipantController extends Controller
         $data = $this->tccPhasePayload($request);
         $tccIdemKey = $this->resolveBranchIdem($request, $data);
         if ($tccIdemKey === '') {
-            return response()->json(ApiResponse::error(100, 'X-Request-Id or branch idempotency key required.'), 200);
+            return response()->json(ApiResponse::error(ResponseConstant::RET_MISSING_PARAM, 'X-Request-Id or branch idempotency key required.'));
         }
 
-        try {
-            $this->points->cancel($tccIdemKey);
-        } catch (RuntimeException $e) {
-            return response()->json(ApiResponse::error(100, $e->getMessage()), 200);
-        }
+        $this->points->cancel($tccIdemKey);
 
         return response()->json(ApiResponse::ok([]));
     }
@@ -147,6 +135,7 @@ final class TccPointsParticipantController extends Controller
                 $data['amount_minor'] = (int) $ctx['points_minor'];
             }
         }
+
         return $data;
     }
 

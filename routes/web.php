@@ -1,9 +1,9 @@
 <?php
 
-use App\Http\Controllers\Admin\AdminOrderController;
-use App\Http\Controllers\Admin\AdminPointsController;
-use App\Http\Controllers\Admin\AdminProductController;
-use App\Http\Controllers\Admin\AdminUploadController;
+use App\Http\Controllers\admin\AdminOrderController;
+use App\Http\Controllers\admin\AdminPointsController;
+use App\Http\Controllers\admin\AdminProductController;
+use App\Http\Controllers\admin\AdminUploadController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', static function () {

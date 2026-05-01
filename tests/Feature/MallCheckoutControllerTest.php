@@ -92,7 +92,7 @@ class MallCheckoutControllerTest extends TestCase
     {
         $this->postJson('/api/mall/checkout', ['order_id' => 1])
             ->assertStatus(401)
-            ->assertJsonPath('errorCode', 40101);
+            ->assertJsonPath('errorCode', 200);
     }
 
     public function test_checkout_returns_prepay_from_saga_and_merges_tcc_fields(): void
@@ -155,7 +155,7 @@ class MallCheckoutControllerTest extends TestCase
             'order_id' => $orderId,
         ])
             ->assertStatus(422)
-            ->assertJsonPath('errorCode', 40001);
+            ->assertJsonPath('errorCode', 300);
     }
 
     public function test_checkout_rejects_when_order_not_draft(): void
@@ -179,7 +179,7 @@ class MallCheckoutControllerTest extends TestCase
             'order_id' => $orderId,
         ])
             ->assertStatus(422)
-            ->assertJsonPath('errorCode', 40001);
+            ->assertJsonPath('errorCode', 300);
     }
 
     public function test_checkout_returns_422_when_order_id_invalid(): void
@@ -201,7 +201,7 @@ class MallCheckoutControllerTest extends TestCase
             'order_id' => 99999,
         ])
             ->assertStatus(404)
-            ->assertJsonPath('errorCode', 40401);
+            ->assertJsonPath('errorCode', 301);
     }
 
     public function test_checkout_maps_saga_envelope_error_to_422(): void
@@ -235,7 +235,7 @@ class MallCheckoutControllerTest extends TestCase
             'points_minor' => 30,
         ])
             ->assertStatus(422)
-            ->assertJsonPath('errorCode', 40001);
+            ->assertJsonPath('errorCode', 300);
     }
 
     public function test_checkout_requires_prepay_in_saga_response(): void
@@ -281,6 +281,6 @@ class MallCheckoutControllerTest extends TestCase
             'order_id' => $orderId,
         ])
             ->assertStatus(422)
-            ->assertJsonPath('errorCode', 40001);
+            ->assertJsonPath('errorCode', 300);
     }
 }

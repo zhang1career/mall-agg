@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Internal;
+namespace App\Http\Controllers\internal;
 
 use App\Components\ApiResponse;
 use App\Http\Controllers\Controller;
@@ -23,12 +23,8 @@ final class InventoryParticipantController extends Controller
         $uid = (int) ($data['uid'] ?? 0);
         $idem = (string) ($data['saga_step_idem_key'] ?? '');
 
-        try {
-            $lines = $this->linesFromPayload($data);
-            $out = $this->inventory->actionPhase($uid, $lines, $idem);
-        } catch (RuntimeException $e) {
-            return response()->json(ApiResponse::error(100, $e->getMessage()), 200);
-        }
+        $lines = $this->linesFromPayload($data);
+        $out = $this->inventory->actionPhase($uid, $lines, $idem);
 
         return response()->json(ApiResponse::ok($out));
     }
@@ -38,11 +34,7 @@ final class InventoryParticipantController extends Controller
         $ctx = $request->input('context');
         $token = is_array($ctx) ? trim((string) ($ctx['inventory_token'] ?? '')) : '';
 
-        try {
-            $this->inventory->compensatePhase($token);
-        } catch (RuntimeException $e) {
-            return response()->json(ApiResponse::error(100, $e->getMessage()), 200);
-        }
+        $this->inventory->compensatePhase($token);
 
         return response()->json(ApiResponse::ok(['inventory_token' => $token]));
     }

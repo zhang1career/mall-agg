@@ -9,8 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Services\mall\MallPaymentCallbackService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
-use RuntimeException;
+use Paganini\Constants\ResponseConstant;
 
 final class PaymentCallbackController extends Controller
 {
@@ -24,34 +23,27 @@ final class PaymentCallbackController extends Controller
         if ($secret !== '') {
             $sent = trim((string) $request->header('X-Payment-Callback-Token', ''));
             if ($sent !== $secret) {
-                return response()->json(ApiResponse::error(40301, 'Invalid payment callback token.'), 403);
+                return response()->json(ApiResponse::error(ResponseConstant::RET_FORBIDDEN, 'Invalid payment callback token.'), 403);
             }
         }
 
-        $validator = Validator::make($request->all(), [
+        $request->validate([
             'order_id' => 'required|integer|min:1',
             'status' => 'sometimes|string',
             'global_tx_id' => 'sometimes|string',
             'points_tcc_idem_key' => 'sometimes|string',
         ]);
-        if ($validator->fails()) {
-            return response()->json(ApiResponse::error(100, $validator->errors()->first()), 422);
-        }
 
         /** @var array<string, mixed> $payload */
         $payload = $request->all();
         $statusRaw = strtolower((string) ($payload['status'] ?? 'paid'));
         if (! in_array($statusRaw, ['paid', 'success', 'payment.success'], true)) {
-            return response()->json(ApiResponse::error(100, 'Unsupported payment status.'), 422);
+            return response()->json(ApiResponse::error(ResponseConstant::RET_INVALID_PARAM, 'Unsupported payment status.'), 422);
         }
 
         $orderId = (int) $payload['order_id'];
 
-        try {
-            $order = $this->payments->handlePaidNotification($orderId, $payload);
-        } catch (RuntimeException $e) {
-            return response()->json(ApiResponse::error(40001, $e->getMessage()), 422);
-        }
+        $order = $this->payments->handlePaidNotification($orderId, $payload);
 
         $this->logHandledApiRequest($request, ['handler' => 'payment.callback', 'order_id' => $order->id]);
 

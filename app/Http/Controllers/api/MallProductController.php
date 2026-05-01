@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Controllers\api;
 
 use App\Components\ApiResponse;
+use App\Exceptions\ConfigurationMissingException;
 use App\Http\Controllers\Controller;
 use App\Services\mall\MallCatalogService;
 use App\Services\mall\serv_fd\SearchRecClient;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Paganini\Aggregation\Exceptions\DownstreamServiceException;
 
 class MallProductController extends Controller
 {
@@ -19,42 +20,44 @@ class MallProductController extends Controller
         private readonly SearchRecClient $searchRec,
     ) {}
 
+    /**
+     * @throws ConnectionException
+     */
     public function index(Request $request): JsonResponse
     {
-        $page = max(1, (int) $request->query('page', 1));
-        $perPage = min(50, max(1, (int) $request->query('per_page', 15)));
+        $requestedPage = (int) $request->query('page', 1);
+        $page = max(1, $requestedPage);
 
-        try {
-            $pack = $this->catalog->listProductsWithPrices($page, $perPage);
-        } catch (DownstreamServiceException $e) {
-            return response()->json(ApiResponse::error(40401, $e->getMessage()), 404);
-        }
+        $requestedPerPage = (int) $request->query('per_page', 15);
+        $perPage = min(50, max(1, $requestedPerPage));
+
+        $pack = $this->catalog->listProductsWithPrices($page, $perPage);
 
         $this->logHandledApiRequest($request, ['handler' => 'mall.products.index']);
 
         return response()->json(ApiResponse::ok($pack));
     }
 
+    /**
+     * @throws ConnectionException
+     */
     public function show(Request $request, int $id): JsonResponse
     {
-        try {
-            $row = $this->catalog->getProductWithPriceAndStock($id);
-        } catch (DownstreamServiceException $e) {
-            return response()->json(ApiResponse::error(40401, $e->getMessage()), 404);
-        }
+        $row = $this->catalog->getProductWithPriceAndStock($id);
 
         $this->logHandledApiRequest($request, ['handler' => 'mall.products.show', 'product_id' => $id]);
 
         return response()->json(ApiResponse::ok($row));
     }
 
+    /**
+     * @throws ConfigurationMissingException
+     * @throws ConnectionException
+     */
     public function search(Request $request): JsonResponse
     {
         if (! $this->searchRec->isConfigured()) {
-            return response()->json(
-                ApiResponse::error(50301, 'Search service is not configured.'),
-                503
-            );
+            throw new ConfigurationMissingException('Search service is not configured.');
         }
 
         $validated = $request->validate([
@@ -72,11 +75,7 @@ class MallProductController extends Controller
             static fn (string $t) => $t !== ''
         ));
 
-        try {
-            $data = $this->searchRec->search($query, $topK, $tags);
-        } catch (DownstreamServiceException $e) {
-            return response()->json(ApiResponse::error(50201, $e->getMessage()), 502);
-        }
+        $data = $this->searchRec->search($query, $topK, $tags);
 
         $this->logHandledApiRequest($request, ['handler' => 'mall.products.search']);
 

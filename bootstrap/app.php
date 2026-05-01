@@ -1,17 +1,14 @@
 <?php
 
-use App\Components\ApiResponse;
+use App\Exceptions\ApiJsonExceptionHandler;
 use App\Http\Middleware\LogApiHttpErrors;
 use App\Http\Middleware\VerifyAdminApiToken;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Validation\ValidationException;
 use Paganini\Env\LayeredEnvLoader;
-use Symfony\Component\HttpKernel\Exception\HttpException;
 
 $app = Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -33,45 +30,7 @@ $app = Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (Throwable $exception, Request $request) {
-            $path = $request->path();
-            if (! str_starts_with($path, 'api/') && ! str_starts_with($path, 'internal/')) {
-                return null;
-            }
-
-            $reqId = $request->header('X-Request-Id') ?: bin2hex(random_bytes(8));
-
-            if ($exception instanceof ValidationException) {
-                $message = $exception->validator->errors()->first() ?: 'Validation failed.';
-
-                return response()->json(
-                    ApiResponse::error(1, $message, $reqId),
-                    422
-                );
-            }
-
-            if ($exception instanceof HttpException) {
-                $status = $exception->getStatusCode();
-
-                return response()->json(
-                    ApiResponse::error($status, $exception->getMessage() ?: 'HTTP error', $reqId),
-                    $status
-                );
-            }
-
-            Log::error('Uncaught API exception', [
-                'exception' => $exception::class,
-                'message' => $exception->getMessage(),
-                'file' => $exception->getFile(),
-                'line' => $exception->getLine(),
-                '_req_id' => $reqId,
-            ]);
-
-            $publicMessage = config('app.debug') ? $exception->getMessage() : '服务器内部错误';
-
-            return response()->json(
-                ApiResponse::error(2, $publicMessage, $reqId),
-                500
-            );
+            return ApiJsonExceptionHandler::render($request, $exception);
         });
     })->create();
 

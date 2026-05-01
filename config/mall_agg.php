@@ -2,6 +2,7 @@
 
 use App\Services\mall\aggregation\LocalProductInventoryProvider;
 use App\Services\mall\aggregation\LocalProductPriceProvider;
+use Paganini\Constants\ResponseConstant;
 
 return [
     /*
@@ -26,7 +27,10 @@ return [
         ],
         'me_endpoint' => '/api/user/me',
         'timeout_seconds' => 3,
-        'unauthorized_code' => 40101,
+        'unauthorized_code' => (int) env(
+            'MALL_AGG_FOUNDATION_UNAUTHORIZED_CODE',
+            ResponseConstant::RET_UNAUTHORIZED
+        ),
     ],
 
     /*
@@ -45,7 +49,10 @@ return [
     'degrade' => [
         'strategy' => env('MALL_AGG_DEGRADE_STRATEGY', env('MALL_AGG_DEGRADE_STRATEGY', 'mask_null')),
         'mask_error_message' => env('MALL_AGG_DEGRADE_MASK_ERROR_MESSAGE', env('MALL_AGG_DEGRADE_MASK_ERROR_MESSAGE', 'Service temporarily unavailable.')),
-        'partial_failure_code' => (int) env('MALL_AGG_PARTIAL_FAILURE_CODE', env('MALL_AGG_PARTIAL_FAILURE_CODE', 20601)),
+        'partial_failure_code' => (int) env(
+            'MALL_AGG_PARTIAL_FAILURE_CODE',
+            ResponseConstant::RET_DEPENDENCY_ERROR
+        ),
         'partial_failure_message' => env('MALL_AGG_PARTIAL_FAILURE_MESSAGE', env('MALL_AGG_PARTIAL_FAILURE_MESSAGE', 'Partially failed, degraded by aggregator.')),
     ],
 

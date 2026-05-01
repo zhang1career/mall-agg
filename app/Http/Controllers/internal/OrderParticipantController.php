@@ -2,15 +2,14 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Internal;
+namespace App\Http\Controllers\internal;
 
 use App\Components\ApiResponse;
 use App\Http\Controllers\Controller;
 use App\Services\mall\Internal\InternalOrderParticipantService;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use RuntimeException;
+use Paganini\Constants\ResponseConstant;
 
 final class OrderParticipantController extends Controller
 {
@@ -27,17 +26,13 @@ final class OrderParticipantController extends Controller
         $idem = (string) ($data['saga_step_idem_key'] ?? '');
         $sagaIdemKey = (int) ($data['saga_idem_key'] ?? 0);
 
-        try {
-            $out = $this->orders->bindDraftOrderAfterInventory(
-                $orderId,
-                $uid,
-                $inventoryToken,
-                $idem,
-                $sagaIdemKey,
-            );
-        } catch (RuntimeException $e) {
-            return response()->json(ApiResponse::error(100, $e->getMessage()), 200);
-        }
+        $out = $this->orders->bindDraftOrderAfterInventory(
+            $orderId,
+            $uid,
+            $inventoryToken,
+            $idem,
+            $sagaIdemKey,
+        );
 
         return response()->json(ApiResponse::ok($out));
     }
@@ -47,16 +42,10 @@ final class OrderParticipantController extends Controller
         $data = $this->payload($request);
         $orderId = (int) ($data['order_id'] ?? 0);
         if ($orderId < 1) {
-            return response()->json(ApiResponse::error(100, 'Invalid order_id.'), 200);
+            return response()->json(ApiResponse::error(ResponseConstant::RET_INVALID_PARAM, 'Invalid order_id.'), 200);
         }
 
-        try {
-            $this->orders->compensate($orderId);
-        } catch (ModelNotFoundException) {
-            return response()->json(ApiResponse::error(100, 'Order not found.'), 200);
-        } catch (RuntimeException $e) {
-            return response()->json(ApiResponse::error(100, $e->getMessage()), 200);
-        }
+        $this->orders->compensate($orderId);
 
         return response()->json(ApiResponse::ok(['order_id' => $orderId]));
     }

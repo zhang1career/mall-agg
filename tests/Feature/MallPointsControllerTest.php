@@ -23,7 +23,7 @@ class MallPointsControllerTest extends TestCase
 
     public function test_points_requires_auth(): void
     {
-        $this->getJson('/api/mall/points')->assertStatus(401)->assertJsonPath('errorCode', 40101);
+        $this->getJson('/api/mall/points')->assertStatus(401)->assertJsonPath('errorCode', 200);
     }
 
     public function test_points_returns_zero_when_no_balance_row(): void

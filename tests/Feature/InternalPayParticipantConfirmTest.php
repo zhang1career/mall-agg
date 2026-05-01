@@ -17,7 +17,7 @@ final class InternalPayParticipantConfirmTest extends TestCase
             ],
         ])
             ->assertOk()
-            ->assertJsonPath('errorCode', 100);
+            ->assertJsonPath('errorCode', 101);
     }
 
     public function test_pay_confirm_posts_to_foundation_tcc_confirm(): void

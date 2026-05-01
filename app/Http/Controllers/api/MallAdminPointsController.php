@@ -12,8 +12,6 @@ use App\Services\mall\MallPointsAdminService;
 use App\Support\MillisTimestampDisplay;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
-use RuntimeException;
 
 final class MallAdminPointsController extends Controller
 {
@@ -23,22 +21,15 @@ final class MallAdminPointsController extends Controller
 
     public function storeAccount(Request $request): JsonResponse
     {
-        $v = Validator::make($request->all(), [
+        $request->validate([
             'uid' => 'required|integer|min:1',
             'balance_minor' => 'sometimes|integer|min:0',
         ]);
-        if ($v->fails()) {
-            return response()->json(ApiResponse::error(100, $v->errors()->first()), 422);
-        }
 
-        try {
-            $balance = $this->adminPoints->openAccount(
-                (int) $request->input('uid'),
-                (int) $request->input('balance_minor', 0),
-            );
-        } catch (RuntimeException $e) {
-            return response()->json(ApiResponse::error(40001, $e->getMessage()), 422);
-        }
+        $balance = $this->adminPoints->openAccount(
+            (int) $request->input('uid'),
+            (int) $request->input('balance_minor', 0),
+        );
 
         $this->logHandledApiRequest($request, ['handler' => 'mall.admin.points.accounts.store', 'uid' => $balance->uid]);
 
@@ -47,24 +38,17 @@ final class MallAdminPointsController extends Controller
 
     public function adjust(Request $request): JsonResponse
     {
-        $v = Validator::make($request->all(), [
+        $request->validate([
             'uid' => 'required|integer|min:1',
             'delta_minor' => 'required|integer|not_in:0',
             'oid' => 'sometimes|integer|min:0',
         ]);
-        if ($v->fails()) {
-            return response()->json(ApiResponse::error(100, $v->errors()->first()), 422);
-        }
 
-        try {
-            $out = $this->adminPoints->adjustBalance(
-                (int) $request->input('uid'),
-                (int) $request->input('delta_minor'),
-                (int) $request->input('oid', 0),
-            );
-        } catch (RuntimeException $e) {
-            return response()->json(ApiResponse::error(40001, $e->getMessage()), 422);
-        }
+        $out = $this->adminPoints->adjustBalance(
+            (int) $request->input('uid'),
+            (int) $request->input('delta_minor'),
+            (int) $request->input('oid', 0),
+        );
 
         $this->logHandledApiRequest($request, [
             'handler' => 'mall.admin.points.adjust',

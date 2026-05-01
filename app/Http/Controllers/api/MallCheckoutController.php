@@ -6,6 +6,7 @@ namespace App\Http\Controllers\api;
 
 use App\Components\ApiResponse;
 use App\Enums\CheckoutPhase;
+use App\Exceptions\ConfigurationMissingException;
 use App\Exceptions\FoundationAuthRequiredException;
 use App\Http\Controllers\Controller;
 use App\Models\MallOrder;
@@ -13,11 +14,8 @@ use App\Services\mall\CheckoutOrchestrator;
 use App\Services\mall\FoundationUser;
 use App\Services\mall\OrderCommandService;
 use App\Services\user\UserFoundationGateway;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
-use RuntimeException;
 
 class MallCheckoutController extends Controller
 {
@@ -26,42 +24,31 @@ class MallCheckoutController extends Controller
         private readonly OrderCommandService $orders,
         private readonly CheckoutOrchestrator $checkout) {}
 
+    /**
+     * @throws FoundationAuthRequiredException
+     * @throws ConfigurationMissingException
+     */
     public function store(Request $request): JsonResponse
     {
-        try {
-            $user = $this->requireAuthenticatedUser($request);
-        } catch (FoundationAuthRequiredException $e) {
-            return $this->unauthorizedResponse($e);
-        }
+        $user = $this->requireAuthenticatedUser($request);
 
-        $validator = Validator::make($request->all(), [
+        $validated = $request->validate([
             'order_id' => 'required|integer|min:1',
             'points_minor' => 'sometimes|integer|min:0',
         ]);
-        if ($validator->fails()) {
-            return response()->json(ApiResponse::error(100, $validator->errors()->first()), 422);
-        }
 
-        $orderId = (int) $request->input('order_id');
-        $pointsMinor = (int) $request->input('points_minor', 0);
+        $orderId = (int) $validated['order_id'];
+        $pointsMinor = (int) ($validated['points_minor'] ?? 0);
         $uid = FoundationUser::id($user);
 
-        try {
-            $order = $this->orders->findForUser($orderId, $uid);
-        } catch (ModelNotFoundException) {
-            return response()->json(ApiResponse::error(40401, 'Order not found.'), 404);
-        }
+        $order = $this->orders->findForUser($orderId, $uid);
 
         $xRequestId = trim((string) $request->header('X-Request-Id', ''));
         if ($xRequestId === '') {
             $xRequestId = '0';
         }
 
-        try {
-            $result = $this->checkout->checkoutExistingOrder($uid, $order, $pointsMinor, $xRequestId);
-        } catch (RuntimeException $e) {
-            return response()->json(ApiResponse::error(40001, $e->getMessage()), 422);
-        }
+        $result = $this->checkout->checkoutExistingOrder($uid, $order, $pointsMinor, $xRequestId);
 
         $order = $result['order'];
         $this->logHandledApiRequest($request, ['handler' => 'mall.checkout.store', 'order_id' => $order->id]);
@@ -78,6 +65,7 @@ class MallCheckoutController extends Controller
      * @return array<string, mixed>
      *
      * @throws FoundationAuthRequiredException
+     * @throws ConfigurationMissingException
      */
     private function requireAuthenticatedUser(Request $request): array
     {
@@ -89,17 +77,6 @@ class MallCheckoutController extends Controller
         }
 
         return $this->foundationGateway->fetchCurrentUser($request);
-    }
-
-    private function unauthorizedResponse(FoundationAuthRequiredException $e): JsonResponse
-    {
-        return response()->json(
-            ApiResponse::error(
-                (int) config('mall_agg.foundation.unauthorized_code', 40101),
-                $e->getMessage()
-            ),
-            401
-        );
     }
 
     /**

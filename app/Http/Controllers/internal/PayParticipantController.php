@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Internal;
+namespace App\Http\Controllers\internal;
 
 use App\Components\ApiResponse;
 use App\Http\Controllers\Controller;
@@ -10,13 +10,13 @@ use App\Services\mall\Internal\InternalPayParticipantService;
 use App\Services\mall\serv_fd\TccTxClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use RuntimeException;
+use Paganini\Constants\ResponseConstant;
 
 final class PayParticipantController extends Controller
 {
     public function __construct(
         private readonly InternalPayParticipantService $pay,
-        private readonly TccTxClient                   $foundationTccTx,
+        private readonly TccTxClient $foundationTccTx,
     ) {}
 
     /**
@@ -29,14 +29,10 @@ final class PayParticipantController extends Controller
         $idem = trim((string) $request->input('idempotency_key', ''));
 
         if ($orderId < 1) {
-            return response()->json(ApiResponse::error(100, 'Invalid order_id.'), 200);
+            return response()->json(ApiResponse::error(ResponseConstant::RET_INVALID_PARAM, 'Invalid order_id.'), 200);
         }
 
-        try {
-            $out = $this->pay->tryPhase($orderId, $idem);
-        } catch (RuntimeException $e) {
-            return response()->json(ApiResponse::error(100, $e->getMessage()), 200);
-        }
+        $out = $this->pay->tryPhase($orderId, $idem);
 
         return response()->json(ApiResponse::ok($out));
     }
@@ -54,20 +50,16 @@ final class PayParticipantController extends Controller
         }
 
         if ($orderId < 1) {
-            return response()->json(ApiResponse::error(100, 'Invalid order_id.'), 200);
+            return response()->json(ApiResponse::error(ResponseConstant::RET_INVALID_PARAM, 'Invalid order_id.'), 200);
         }
         if ($idemKey === '') {
-            return response()->json(ApiResponse::error(100, 'X-Request-Id or idem_key is required.'), 200);
+            return response()->json(ApiResponse::error(ResponseConstant::RET_MISSING_PARAM, 'X-Request-Id or idem_key is required.'), 200);
         }
         if (! ctype_digit($idemKey)) {
-            return response()->json(ApiResponse::error(100, 'idem_key must be a decimal integer string.'), 200);
+            return response()->json(ApiResponse::error(ResponseConstant::RET_PARAM_FORMAT_ERROR, 'idem_key must be a decimal integer string.'), 200);
         }
 
-        try {
-            $tcc = $this->foundationTccTx->confirm($idemKey);
-        } catch (RuntimeException $e) {
-            return response()->json(ApiResponse::error(100, $e->getMessage()), 200);
-        }
+        $tcc = $this->foundationTccTx->confirm($idemKey);
 
         return response()->json(ApiResponse::ok([
             'order_id' => $orderId,
@@ -82,14 +74,10 @@ final class PayParticipantController extends Controller
         $idem = (string) ($data['saga_step_idem_key'] ?? '');
 
         if ($orderId < 1) {
-            return response()->json(ApiResponse::error(100, 'Invalid order_id.'), 200);
+            return response()->json(ApiResponse::error(ResponseConstant::RET_INVALID_PARAM, 'Invalid order_id.'), 200);
         }
 
-        try {
-            $this->pay->cancelPhase($orderId, $idem);
-        } catch (RuntimeException $e) {
-            return response()->json(ApiResponse::error(100, $e->getMessage()), 200);
-        }
+        $this->pay->cancelPhase($orderId, $idem);
 
         return response()->json(ApiResponse::ok(['order_id' => $orderId]));
     }

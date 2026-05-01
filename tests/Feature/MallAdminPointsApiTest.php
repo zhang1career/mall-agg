@@ -58,7 +58,7 @@ class MallAdminPointsApiTest extends TestCase
         $this->withHeader('Authorization', 'Bearer test-admin-secret')
             ->postJson('/api/mall/admin/points/accounts', ['uid' => 7, 'balance_minor' => 0])
             ->assertStatus(422)
-            ->assertJsonPath('errorCode', 40001);
+            ->assertJsonPath('errorCode', 300);
     }
 
     public function test_adjust_updates_balance_and_inserts_flow(): void
@@ -90,7 +90,7 @@ class MallAdminPointsApiTest extends TestCase
         $this->withHeader('Authorization', 'Bearer test-admin-secret')
             ->postJson('/api/mall/admin/points/adjust', ['uid' => 1, 'delta_minor' => 10])
             ->assertStatus(422)
-            ->assertJsonPath('errorCode', 40001);
+            ->assertJsonPath('errorCode', 300);
     }
 
     public function test_adjust_insufficient_returns_422(): void

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\api;
 
 use App\Components\ApiResponse;
+use App\Exceptions\ConfigurationMissingException;
 use App\Exceptions\FoundationAuthRequiredException;
 use App\Http\Controllers\Controller;
 use App\Services\mall\FoundationUser;
@@ -22,14 +23,12 @@ class MallPointsController extends Controller
 
     /**
      * Current user's available points balance (minor units).
+     * @throws FoundationAuthRequiredException
+     * @throws ConfigurationMissingException
      */
     public function show(Request $request): JsonResponse
     {
-        try {
-            $user = $this->requireAuthenticatedUser($request);
-        } catch (FoundationAuthRequiredException $e) {
-            return $this->unauthorizedResponse($e);
-        }
+        $user = $this->requireAuthenticatedUser($request);
 
         $minor = $this->points->availableBalanceMinor(FoundationUser::id($user));
 
@@ -42,7 +41,9 @@ class MallPointsController extends Controller
 
     /**
      * @return array<string, mixed>
+     *
      * @throws FoundationAuthRequiredException
+     * @throws ConfigurationMissingException
      */
     private function requireAuthenticatedUser(Request $request): array
     {
@@ -54,16 +55,5 @@ class MallPointsController extends Controller
         }
 
         return $this->foundationGateway->fetchCurrentUser($request);
-    }
-
-    private function unauthorizedResponse(FoundationAuthRequiredException $e): JsonResponse
-    {
-        return response()->json(
-            ApiResponse::error(
-                (int) config('mall_agg.foundation.unauthorized_code', 40101),
-                $e->getMessage()
-            ),
-            401
-        );
     }
 }

@@ -7,116 +7,92 @@ namespace App\Http\Controllers\api;
 use App\Components\ApiResponse;
 use App\Enums\CheckoutPhase;
 use App\Enums\MallOrderStatus;
+use App\Exceptions\ConfigurationMissingException;
 use App\Exceptions\FoundationAuthRequiredException;
 use App\Http\Controllers\Controller;
 use App\Models\MallOrder;
 use App\Services\mall\FoundationUser;
 use App\Services\mall\OrderCommandService;
 use App\Services\user\UserFoundationGateway;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
-use RuntimeException;
-use ValueError;
+use Paganini\Constants\ResponseConstant;
 
 class MallOrderController extends Controller
 {
     public function __construct(
         private readonly UserFoundationGateway $foundationGateway,
-        private readonly OrderCommandService   $orders)
-    {
-    }
+        private readonly OrderCommandService $orders) {}
 
+    /**
+     * @throws FoundationAuthRequiredException
+     * @throws ConfigurationMissingException
+     */
     public function store(Request $request): JsonResponse
     {
-        try {
-            $user = $this->requireAuthenticatedUser($request);
-        } catch (FoundationAuthRequiredException $e) {
-            return $this->unauthorizedResponse($e);
-        }
+        $user = $this->requireAuthenticatedUser($request);
 
-        $validator = Validator::make($request->all(), [
+        $request->validate([
             'lines' => 'required|array|min:1',
             'lines.*.product_id' => 'required|integer|min:1',
             'lines.*.quantity' => 'required|integer|min:1',
         ]);
-        if ($validator->fails()) {
-            return response()->json(ApiResponse::error(100, $validator->errors()->first()), 422);
-        }
 
         /** @var list<array{product_id: int, quantity: int}> $lines */
         $lines = [];
         foreach ($request->input('lines', []) as $line) {
-            if (!is_array($line)) {
+            if (! is_array($line)) {
                 continue;
             }
             $lines[] = [
-                'product_id' => (int)$line['product_id'],
-                'quantity' => (int)$line['quantity'],
+                'product_id' => (int) $line['product_id'],
+                'quantity' => (int) $line['quantity'],
             ];
         }
 
-        try {
-            $order = $this->orders->createDraftPendingOrder(FoundationUser::id($user), $lines);
-        } catch (RuntimeException $e) {
-            return response()->json(ApiResponse::error(40001, $e->getMessage()), 422);
-        }
+        $order = $this->orders->createDraftPendingOrder(FoundationUser::id($user), $lines);
 
         $this->logHandledApiRequest($request, ['handler' => 'mall.orders.store', 'order_id' => $order->id]);
 
         return response()->json(ApiResponse::ok($this->serializeOrder($order)), 201);
     }
 
+    /**
+     * @throws FoundationAuthRequiredException
+     * @throws ConfigurationMissingException
+     */
     public function update(Request $request, int $id): JsonResponse
     {
-        try {
-            $user = $this->requireAuthenticatedUser($request);
-        } catch (FoundationAuthRequiredException $e) {
-            return $this->unauthorizedResponse($e);
-        }
+        $user = $this->requireAuthenticatedUser($request);
 
-        $validator = Validator::make($request->all(), [
+        $request->validate([
             'status' => 'required',
         ]);
-        if ($validator->fails()) {
-            return response()->json(ApiResponse::error(100, $validator->errors()->first()), 422);
-        }
 
         $raw = $request->input('status');
-        if (!is_string($raw) && !is_int($raw)) {
-            return response()->json(ApiResponse::error(100, 'Invalid status.'), 422);
+        if (! is_string($raw) && ! is_int($raw)) {
+            return response()->json(ApiResponse::error(ResponseConstant::RET_INVALID_PARAM, 'Invalid status.'), 422);
         }
 
-        try {
-            $next = MallOrderStatus::fromClient($raw);
-        } catch (ValueError) {
-            return response()->json(ApiResponse::error(100, 'Invalid status.'), 422);
-        }
+        $next = MallOrderStatus::fromClient($raw);
 
-        try {
-            $order = $this->orders->findForUser($id, FoundationUser::id($user));
-            $order = $this->orders->transitionStatus($order, $next);
-        } catch (ModelNotFoundException) {
-            return response()->json(ApiResponse::error(40401, 'Order not found.'), 404);
-        } catch (RuntimeException $e) {
-            return response()->json(ApiResponse::error(40001, $e->getMessage()), 422);
-        }
+        $order = $this->orders->findForUser($id, FoundationUser::id($user));
+        $order = $this->orders->transitionStatus($order, $next);
 
         $this->logHandledApiRequest($request, ['handler' => 'mall.orders.update', 'order_id' => $id]);
 
         return response()->json(ApiResponse::ok($this->serializeOrder($order)));
     }
 
+    /**
+     * @throws FoundationAuthRequiredException
+     * @throws ConfigurationMissingException
+     */
     public function index(Request $request): JsonResponse
     {
-        try {
-            $user = $this->requireAuthenticatedUser($request);
-        } catch (FoundationAuthRequiredException $e) {
-            return $this->unauthorizedResponse($e);
-        }
+        $user = $this->requireAuthenticatedUser($request);
 
-        $perPage = min(50, max(1, (int)$request->query('per_page', 15)));
+        $perPage = min(50, max(1, (int) $request->query('per_page', 15)));
 
         $paginator = $this->orders->paginateForUser(FoundationUser::id($user), $perPage);
         $items = [];
@@ -137,19 +113,15 @@ class MallOrderController extends Controller
         ]));
     }
 
+    /**
+     * @throws FoundationAuthRequiredException
+     * @throws ConfigurationMissingException
+     */
     public function show(Request $request, int $id): JsonResponse
     {
-        try {
-            $user = $this->requireAuthenticatedUser($request);
-        } catch (FoundationAuthRequiredException $e) {
-            return $this->unauthorizedResponse($e);
-        }
+        $user = $this->requireAuthenticatedUser($request);
 
-        try {
-            $order = $this->orders->findForUser($id, FoundationUser::id($user));
-        } catch (ModelNotFoundException) {
-            return response()->json(ApiResponse::error(40401, 'Order not found.'), 404);
-        }
+        $order = $this->orders->findForUser($id, FoundationUser::id($user));
 
         $this->logHandledApiRequest($request, ['handler' => 'mall.orders.show', 'order_id' => $id]);
 
@@ -158,11 +130,13 @@ class MallOrderController extends Controller
 
     /**
      * @return array<string, mixed>
+     *
      * @throws FoundationAuthRequiredException
+     * @throws ConfigurationMissingException
      */
     private function requireAuthenticatedUser(Request $request): array
     {
-        $token = trim((string)$request->header('X-User-Access-Token', ''));
+        $token = trim((string) $request->header('X-User-Access-Token', ''));
         if ($token === '') {
             throw new FoundationAuthRequiredException(
                 'Authentication required. Send header: X-User-Access-Token: <access_token> (raw JWT, no Bearer prefix).'
@@ -170,17 +144,6 @@ class MallOrderController extends Controller
         }
 
         return $this->foundationGateway->fetchCurrentUser($request);
-    }
-
-    private function unauthorizedResponse(FoundationAuthRequiredException $e): JsonResponse
-    {
-        return response()->json(
-            ApiResponse::error(
-                (int)config('mall_agg.foundation.unauthorized_code', 40101),
-                $e->getMessage()
-            ),
-            401
-        );
     }
 
     /**

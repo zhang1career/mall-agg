@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\user;
 
+use App\Exceptions\ConfigurationMissingException;
 use App\Exceptions\FoundationAuthRequiredException;
 use App\Services\api_gw\ResolvedApiGatewayBaseUrl;
 use Illuminate\Http\Client\Response as ClientResponse;
@@ -11,19 +12,16 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Paganini\Aggregation\Exceptions\DownstreamServiceException;
 use Paganini\Aggregation\Support\DownstreamPayload;
-use RuntimeException;
 
 readonly class UserFoundationGateway
 {
-    public function __construct(private ResolvedApiGatewayBaseUrl $resolvedFoundationBaseUrl)
-    {
-    }
+    public function __construct(private ResolvedApiGatewayBaseUrl $resolvedFoundationBaseUrl) {}
 
     public function fetchCurrentUser(Request $request): array
     {
         $baseUrl = $this->resolvedFoundationBaseUrl->resolve();
         if ($baseUrl === '') {
-            throw new RuntimeException('Missing user foundation base_url configuration.');
+            throw new ConfigurationMissingException('Missing user foundation base_url configuration.');
         }
 
         $timeout = (int) config('mall_agg.foundation.timeout_seconds', 3);
@@ -33,13 +31,13 @@ readonly class UserFoundationGateway
         $response = Http::timeout($timeout)
             ->withHeaders(['X-User-Access-Token' => $token])
             ->acceptJson()
-            ->get($baseUrl . $endpoint);
+            ->get($baseUrl.$endpoint);
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             if ($response->status() === 401) {
                 throw $this->authRequiredFromHttpResponse($response);
             }
-            throw new RuntimeException('Failed to fetch base user info from foundation service.');
+            throw new DownstreamServiceException('Failed to fetch base user info from foundation service.');
         }
 
         try {
@@ -61,7 +59,7 @@ readonly class UserFoundationGateway
         }
 
         return new FoundationAuthRequiredException(
-            'Downstream error from foundation user service: ' . $detail
+            'Downstream error from foundation user service: '.$detail
         );
     }
 }

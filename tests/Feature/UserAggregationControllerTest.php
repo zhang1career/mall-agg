@@ -13,7 +13,7 @@ class UserAggregationControllerTest extends TestCase
         $response = $this->getJson('/api/user/me');
 
         $response->assertStatus(401)
-            ->assertJsonPath('errorCode', 40101);
+            ->assertJsonPath('errorCode', 200);
         $this->assertStringContainsString('Authentication required', (string) $response->json('message'));
     }
 
